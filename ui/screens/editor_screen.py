@@ -22,7 +22,7 @@ from PySide6.QtGui import QColor, QPalette, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QPlainTextEdit, QTableView, QProgressBar, QFrame, QMessageBox,
-    QTextEdit, QAbstractItemView, QSplitter
+    QTextEdit, QAbstractItemView, QSplitter, QHeaderView
 )
 
 from core.tm import TranslationMemory
@@ -310,14 +310,91 @@ class EditorScreen(QWidget):
         self.adv_filter.setVisible(False)
         layout.addWidget(self.adv_filter)
 
-        # ---------------- Splitter principal: Tabela em cima, Editor embaixo
+        # ---------------- Splitter principal Vertical (Layout Oficial Trados Studio)
         splitter = QSplitter(Qt.Vertical)
 
-        # Tabela virtualizada de segmentos
+        # 1. Painel Superior: Translation Results (TM Matches, Concordância, SLM Neural)
+        results_panel = QFrame()
+        results_panel.setStyleSheet("background-color: #202022; border: 1px solid #333333; border-radius: 4px;")
+        rf_layout = QVBoxLayout(results_panel)
+        rf_layout.setContentsMargins(8, 4, 8, 4)
+        rf_layout.setSpacing(4)
+
+        rf_header = QHBoxLayout()
+        rf_header.setSpacing(8)
+
+        icon_res = QLabel("📋")
+        rf_header.addWidget(icon_res)
+
+        title_res = QLabel("Translation Results")
+        title_res.setStyleSheet("color: #8eb4f3; font-weight: bold; font-size: 11px;")
+        rf_header.addWidget(title_res)
+
+        self.lbl_attached_tm = QLabel("[Nenhuma TM associada]")
+        self.lbl_attached_tm.setStyleSheet("color: #e67e22; font-size: 10px; background-color: #2b2210; border: 1px solid #7d4806; border-radius: 3px; padding: 1px 6px;")
+        rf_header.addWidget(self.lbl_attached_tm)
+
+        rf_header.addStretch()
+
+        btn_apply_match = QPushButton("Aplicar Tradução (Ctrl+T)")
+        btn_apply_match.setStyleSheet("""
+            QPushButton {
+                background-color: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6;
+                border-radius: 3px; padding: 2px 10px; font-size: 10px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2563eb; color: #ffffff; }
+        """)
+        btn_apply_match.clicked.connect(self._apply_best_match)
+        rf_header.addWidget(btn_apply_match)
+
+        btn_copy_src = QPushButton("Copiar Fonte (Ctrl+Ins)")
+        btn_copy_src.setStyleSheet("""
+            QPushButton {
+                background-color: #333; color: #ddd; border: 1px solid #444;
+                border-radius: 3px; padding: 2px 8px; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #444; color: white; }
+        """)
+        btn_copy_src.clicked.connect(self.copy_source_to_target)
+        rf_header.addWidget(btn_copy_src)
+
+        self.btn_settings_tm = QPushButton("⚙ Associar TM (Alt+F8)")
+        self.btn_settings_tm.setStyleSheet("""
+            QPushButton {
+                background-color: #333; color: #aaa; border: 1px solid #444;
+                border-radius: 3px; padding: 2px 8px; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #444; color: white; }
+        """)
+        self.btn_settings_tm.clicked.connect(self.show_project_settings)
+        rf_header.addWidget(self.btn_settings_tm)
+        rf_layout.addLayout(rf_header)
+
+        self.fuzzy_edit = QTextEdit()
+        self.fuzzy_edit.setReadOnly(True)
+        self.fuzzy_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #181818;
+                color: #e0e0e0;
+                border: 1px solid #2d2d30;
+                border-radius: 3px;
+                padding: 6px;
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 11px;
+                line-height: 1.4;
+            }
+        """)
+        rf_layout.addWidget(self.fuzzy_edit)
+        splitter.addWidget(results_panel)
+
+        # 2. Painel Central: Grelha Bilingue de Edição (Tabela Virtualizada com In-Cell Editing)
         self.table = QTableView()
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setDefaultSectionSize(26)
+        self.table.setWordWrap(True)
+        self.table.setTextElideMode(Qt.ElideNone)
+        self.table.verticalHeader().setDefaultSectionSize(32)
+        self.table.verticalHeader().setMinimumSectionSize(26)
         self.table.setStyleSheet("""
             QTableView {
                 background-color: #1e1e1e;
@@ -325,29 +402,33 @@ class EditorScreen(QWidget):
                 selection-background-color: #094771;
                 selection-color: white;
                 font-family: 'Segoe UI', sans-serif;
-                font-size: 11px;
+                font-size: 12px;
             }
             QTableView::item {
-                padding: 4px;
+                padding: 4px 6px;
+            }
+            QTableView::item:selected {
+                background-color: #094771;
             }
             QHeaderView::section {
                 background-color: #2d2d30;
                 color: #8eb4f3;
-                padding: 5px;
+                padding: 6px;
                 border: none;
                 border-bottom: 1px solid #3e3e42;
                 font-weight: bold;
+                font-size: 11px;
             }
         """)
         splitter.addWidget(self.table)
 
-        # Painel inferior: Editor de Fonte, Tradução e Concordância/Fuzzy
-        edit_panel = QWidget()
+        # 3. Painel Inferior: Editor Focado do Segmento Ativo (Sincronizado)
+        edit_panel = QFrame()
+        edit_panel.setStyleSheet("background-color: #202022; border: 1px solid #333333; border-radius: 4px;")
         ev = QVBoxLayout(edit_panel)
-        ev.setContentsMargins(0, 4, 0, 0)
+        ev.setContentsMargins(8, 4, 8, 4)
         ev.setSpacing(4)
 
-        # Painéis lado a lado ou verticais para Fonte e Tradução
         sub_splitter = QSplitter(Qt.Horizontal)
 
         # Coluna Fonte
@@ -361,7 +442,7 @@ class EditorScreen(QWidget):
         self.src_edit.setReadOnly(True)
         self.src_edit.setStyleSheet("""
             QPlainTextEdit {
-                background-color: #1e1e1e;
+                background-color: #1a1a1a;
                 color: #cccccc;
                 border: 1px solid #3e3e42;
                 border-radius: 4px;
@@ -377,13 +458,28 @@ class EditorScreen(QWidget):
         tgt_box = QWidget()
         tgt_v = QVBoxLayout(tgt_box)
         tgt_v.setContentsMargins(0, 0, 0, 0)
-        tgt_lbl = QLabel("Tradução (Editável):")
+        tgt_header = QHBoxLayout()
+        tgt_lbl = QLabel("Tradução Ativa (Ctrl+Enter para Confirmar):")
         tgt_lbl.setStyleSheet("color: #2ecc71; font-weight: bold; font-size: 11px;")
-        tgt_v.addWidget(tgt_lbl)
+        tgt_header.addWidget(tgt_lbl)
+        tgt_header.addStretch()
+
+        btn_confirm = QPushButton("✓ Confirmar & Próximo (Ctrl+Enter)")
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60; color: white; border: none;
+                border-radius: 3px; padding: 2px 10px; font-weight: bold; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #2ecc71; }
+        """)
+        btn_confirm.clicked.connect(self.confirm_and_next)
+        tgt_header.addWidget(btn_confirm)
+        tgt_v.addLayout(tgt_header)
+
         self.tgt_edit = QPlainTextEdit()
         self.tgt_edit.setStyleSheet("""
             QPlainTextEdit {
-                background-color: #1e1e1e;
+                background-color: #1a1a1a;
                 color: #ffffff;
                 border: 1px solid #27ae60;
                 border-radius: 4px;
@@ -395,65 +491,15 @@ class EditorScreen(QWidget):
                 border: 2px solid #2ecc71;
             }
         """)
+        self.tgt_edit.textChanged.connect(self._on_tgt_text_changed)
         tgt_v.addWidget(self.tgt_edit)
         sub_splitter.addWidget(tgt_box)
 
+        sub_splitter.setSizes([380, 500])
         ev.addWidget(sub_splitter)
-
-        # Painel de Resultados de TM e Concordância
-        fuzzy_header = QHBoxLayout()
-        fuzzy_header.setSpacing(6)
-
-        fuzzy_lbl = QLabel("Resultados de Tradução (TM / Concordância):")
-        fuzzy_lbl.setStyleSheet("color: #f39c12; font-weight: bold; font-size: 10px;")
-        fuzzy_header.addWidget(fuzzy_lbl)
-
-        self.lbl_attached_tm = QLabel("[Nenhuma TM associada]")
-        self.lbl_attached_tm.setStyleSheet("color: #e67e22; font-size: 10px; background-color: #2b2210; border: 1px solid #7d4806; border-radius: 3px; padding: 1px 6px;")
-        fuzzy_header.addWidget(self.lbl_attached_tm)
-
-        fuzzy_header.addStretch()
-
-        self.btn_settings_tm = QPushButton("⚙ Associar TM (Alt+F8)")
-        self.btn_settings_tm.setStyleSheet("""
-            QPushButton {
-                background-color: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6;
-                border-radius: 3px; padding: 2px 8px; font-size: 10px; font-weight: bold;
-            }
-            QPushButton:hover { background-color: #2563eb; color: #ffffff; }
-        """)
-        self.btn_settings_tm.clicked.connect(self.show_project_settings)
-        fuzzy_header.addWidget(self.btn_settings_tm)
-
-        btn_apply_match = QPushButton("Aplicar Correspondência (Ctrl+T)")
-        btn_apply_match.setStyleSheet("""
-            QPushButton {
-                background-color: #333; color: #f39c12; border: 1px solid #555;
-                border-radius: 3px; padding: 2px 8px; font-size: 10px;
-            }
-            QPushButton:hover { background-color: #444; }
-        """)
-        btn_apply_match.clicked.connect(self._apply_best_match)
-        fuzzy_header.addWidget(btn_apply_match)
-        ev.addLayout(fuzzy_header)
-
-        self.fuzzy_edit = QTextEdit()
-        self.fuzzy_edit.setReadOnly(True)
-        self.fuzzy_edit.setFixedHeight(75)
-        self.fuzzy_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: #181818;
-                color: #bbbbbb;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                padding: 4px;
-                font-size: 11px;
-            }
-        """)
-        ev.addWidget(self.fuzzy_edit)
-
         splitter.addWidget(edit_panel)
-        splitter.setSizes([380, 220])
+
+        splitter.setSizes([100, 480, 140])
         layout.addWidget(splitter)
 
     def _setup_shortcuts(self) -> None:
@@ -899,12 +945,17 @@ class EditorScreen(QWidget):
 
         self.model = SegmentsModel(tm)
         self.table.setModel(self.model)
+        self.model.dataChanged.connect(self._on_model_data_changed)
 
         if self.table.selectionModel():
             self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
-        for i, w in enumerate((480, 480, 110, 80, 50)):
-            self.table.setColumnWidth(i, w)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
         if count > 0:
             self._select_row(0)
@@ -934,8 +985,39 @@ class EditorScreen(QWidget):
         seg = self.model.segment_at(row)
         if seg:
             self.src_edit.setPlainText(display_text(seg.source))
+            self._is_syncing = True
             self.tgt_edit.setPlainText(display_text(seg.target))
+            self._is_syncing = False
             self._lookup_matches(seg)
+
+    def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
+        """Sincroniza o editor de texto inferior quando uma célula é editada na tabela."""
+        if getattr(self, "_is_syncing", False):
+            return
+        if self._current_row >= top_left.row() and self._current_row <= bottom_right.row():
+            seg = self.model.segment_at(self._current_row)
+            if seg:
+                self._is_syncing = True
+                self.tgt_edit.blockSignals(True)
+                self.tgt_edit.setPlainText(display_text(seg.target))
+                self.tgt_edit.blockSignals(False)
+                self._is_syncing = False
+        self._update_stats()
+
+    def _on_tgt_text_changed(self) -> None:
+        """Sincroniza a célula da tabela em tempo real enquanto o utilizador escreve no editor."""
+        if getattr(self, "_is_syncing", False) or self._current_row < 0 or not self.model or not self.tm:
+            return
+        seg = self.model.segment_at(self._current_row)
+        if not seg:
+            return
+        new_txt = self.tgt_edit.toPlainText()
+        if new_txt != display_text(seg.target):
+            self._is_syncing = True
+            seg.target = new_txt
+            idx = self.model.index(self._current_row, 1)
+            self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole])
+            self._is_syncing = False
 
     def _lookup_matches(self, seg) -> None:
         """Busca correspondências nas memórias de tradução associadas (.sdltm, .tmx) e na TM local."""
@@ -1246,12 +1328,17 @@ class EditorScreen(QWidget):
 
         total = self.tm.count()
         translated = self.tm.count_translated()
-        percentage = max(0.0, min(100.0, (translated / total * 100.0))) if total > 0 else 0.0
         state_counts = self.tm.count_by_state()
         self.review_bar.update_counts(state_counts)
 
+        total_words = self.tm.total_words()
+        trans_words = self.tm.translated_words()
+        percentage = (trans_words / total_words * 100.0) if total_words > 0 else ((translated / total * 100.0) if total > 0 else 0.0)
+        percentage = max(0.0, min(100.0, percentage))
+
         self._stats_label.setText(
-            f"Segmentos: {total:,}  |  Traduzidos: {translated:,} ({percentage:.1f}%)  |  "
+            f"Palavras: {total_words:,} ({trans_words:,} traduzidas, {percentage:.1f}%)  |  "
+            f"Segmentos: {total:,} ({translated:,} traduzidos)  |  "
             f"Idioma: {self._src_lang} ➔ {self._tgt_lang}"
         )
         self._progress_bar.setValue(int(round(percentage)))
@@ -1270,12 +1357,13 @@ class EditorScreen(QWidget):
                         pf.draft_count = state_counts.get("draft", 0)
                         pf.rejected_count = state_counts.get("rejected", 0)
                         pf.untranslated_count = state_counts.get("untranslated", 0)
-                        if pf.words > 0 and total > 0:
-                            pf.translated_words = int(round((pf.translated_count / total) * pf.words))
-                            pf.approved_words = int(round((pf.approved_count / total) * pf.words))
-                            pf.draft_words = int(round((pf.draft_count / total) * pf.words))
-                            pf.rejected_words = int(round((pf.rejected_count / total) * pf.words))
-                            pf.untranslated_words = max(0, pf.words - (pf.translated_words + pf.approved_words + pf.draft_words + pf.rejected_words))
+                        if total_words > 0:
+                            pf.words = total_words
+                            pf.translated_words = trans_words
+                            pf.approved_words = int(round((pf.approved_count / total) * total_words)) if total > 0 else 0
+                            pf.draft_words = int(round((pf.draft_count / total) * total_words)) if total > 0 else 0
+                            pf.rejected_words = int(round((pf.rejected_count / total) * total_words)) if total > 0 else 0
+                            pf.untranslated_words = max(0, total_words - (pf.translated_words + pf.approved_words + pf.draft_words + pf.rejected_words))
                         pf.status = "Translated" if pf.progress >= 100.0 else ("In Translation" if pf.progress > 0 else "New")
                         break
             except Exception:

@@ -81,3 +81,4 @@ if /i "%INICIAR%"=="S" (
 )
 
 exit /b 0
+

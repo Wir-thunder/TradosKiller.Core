@@ -183,7 +183,39 @@ class SegmentsModel(QAbstractTableModel):
             if col in (2, 3, 4):
                 return int(Qt.AlignCenter)
 
+        if role == Qt.ToolTipRole:
+            return f"Segmento #{row + 1} | Estado: {seg.state.value} | Origem: {seg.origin.value}"
+
         return None
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        if not index.isValid():
+            return Qt.NoItemFlags
+        base_flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        if index.column() == 1:  # Coluna Tradução editável diretamente na tabela
+            return base_flags | Qt.ItemIsEditable
+        return base_flags
+
+    def setData(self, index: QModelIndex, value, role: int = Qt.EditRole) -> bool:
+        if not index.isValid() or role != Qt.EditRole or index.column() != 1:
+            return False
+        row = index.row()
+        seg = self._ensure(row)
+        if seg is None:
+            return False
+        new_text = str(value) if value is not None else ""
+        if new_text != display_text(seg.target):
+            new_state = SegState.TRANSLATED if new_text.strip() else SegState.UNTRANSLATED
+            self.tm.update_target(seg.row_id, new_text, new_state)
+            seg.target = new_text
+            seg.state = new_state
+            if self._is_filtered:
+                self._id_cache[seg.row_id] = seg
+            else:
+                self._cache[row] = seg
+            self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1), [Qt.DisplayRole, Qt.ForegroundRole])
+            return True
+        return False
 
     # --------------------------------------------- carregamento paginado (lazy)
     def canFetchMore(self, parent=QModelIndex()) -> bool:

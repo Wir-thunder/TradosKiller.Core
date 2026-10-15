@@ -58,7 +58,8 @@ class TranslationMemory:
                 tgtlang TEXT,
                 source_tags TEXT NOT NULL DEFAULT '[]',
                 target_tags TEXT NOT NULL DEFAULT '[]',
-                segment_order INTEGER NOT NULL DEFAULT 0
+                segment_order INTEGER NOT NULL DEFAULT 0,
+                words   INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -67,6 +68,7 @@ class TranslationMemory:
             ("source_tags", "TEXT NOT NULL DEFAULT '[]'"),
             ("target_tags", "TEXT NOT NULL DEFAULT '[]'"),
             ("segment_order", "INTEGER NOT NULL DEFAULT 0"),
+            ("words", "INTEGER NOT NULL DEFAULT 0"),
         ):
             if column not in existing:
                 cur.execute(f"ALTER TABLE segments ADD COLUMN {column} {definition}")
@@ -180,14 +182,15 @@ class TranslationMemory:
             max_row = self.conn.execute("SELECT MAX(segment_order) FROM segments").fetchone()
             seg_order = (max_row[0] + 1) if (max_row and max_row[0] is not None) else 0
 
+        words = len(display_text(seg.source).split())
         cur = self.conn.cursor()
         cur.execute(
             "INSERT INTO segments(tu_id,seg_id,source,target,state,origin,percent,srclang,tgtlang,"
-            "source_tags,target_tags,segment_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "source_tags,target_tags,segment_order,words) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 seg.tu_id, seg.seg_id, seg.source, seg.target,
                 seg.state.value, seg.origin.value, seg.percent, srclang, tgtlang,
-                _encode_tags(seg.source_tags), _encode_tags(seg.target_tags), seg_order,
+                _encode_tags(seg.source_tags), _encode_tags(seg.target_tags), seg_order, words
             ),
         )
         self.conn.commit()
@@ -213,16 +216,17 @@ class TranslationMemory:
         try:
             for seg in segs:
                 seg_order = seg.order if seg.order != 0 else (base_order + total_inserted + len(batch))
+                words = len(display_text(seg.source).split())
                 batch.append((
                     seg.tu_id, seg.seg_id, seg.source, seg.target,
                     seg.state.value, seg.origin.value, seg.percent, srclang, tgtlang,
-                    _encode_tags(seg.source_tags), _encode_tags(seg.target_tags), seg_order
+                    _encode_tags(seg.source_tags), _encode_tags(seg.target_tags), seg_order, words
                 ))
 
                 if len(batch) >= batch_size:
                     cur.executemany(
                         "INSERT INTO segments(tu_id,seg_id,source,target,state,origin,percent,srclang,tgtlang,"
-                        "source_tags,target_tags,segment_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "source_tags,target_tags,segment_order,words) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         batch
                     )
                     self.conn.commit()
@@ -234,7 +238,7 @@ class TranslationMemory:
             if batch:
                 cur.executemany(
                     "INSERT INTO segments(tu_id,seg_id,source,target,state,origin,percent,srclang,tgtlang,"
-                    "source_tags,target_tags,segment_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "source_tags,target_tags,segment_order,words) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     batch
                 )
                 self.conn.commit()
@@ -337,6 +341,31 @@ class TranslationMemory:
                 result[st] += r[1]
             else:
                 result["untranslated"] += r[1]
+        return result
+
+    def total_words(self) -> int:
+        """Total de palavras no texto fonte (padrão Trados Studio)."""
+        r = self.conn.execute("SELECT COALESCE(SUM(words), 0) FROM segments").fetchone()
+        return int(r[0]) if r and r[0] is not None else 0
+
+    def translated_words(self) -> int:
+        """Total de palavras em segmentos traduzidos/aprovados com conteúdo de destino."""
+        r = self.conn.execute(
+            "SELECT COALESCE(SUM(words), 0) FROM segments WHERE state IN ('translated', 'approved') AND target IS NOT NULL AND trim(target)<>''"
+        ).fetchone()
+        return int(r[0]) if r and r[0] is not None else 0
+
+    def words_by_state(self) -> dict[str, int]:
+        """Retorna a contagem de palavras agrupadas por estado de tradução."""
+        rows = self.conn.execute("SELECT state, COALESCE(SUM(words), 0) FROM segments GROUP BY state").fetchall()
+        result = {"untranslated": 0, "draft": 0, "translated": 0, "approved": 0, "rejected": 0}
+        for r in rows:
+            st = (r[0] or "untranslated").lower().strip()
+            w = int(r[1]) if r[1] is not None else 0
+            if st in result:
+                result[st] += w
+            else:
+                result["untranslated"] += w
         return result
 
     def filter_ids(self, query: str = "", field: str = "both",

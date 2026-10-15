@@ -905,6 +905,77 @@ class TestTradosFull(unittest.TestCase):
         if os.path.exists(db_path):
             os.remove(db_path)
 
+    def test_sdlxliff_structural_filtering(self):
+        """Verifica que trans-units estruturais sem seg-source não são tratadas como segmentos não traduzidos."""
+        import tempfile
+        from io_layer.sdlxliff import iter_sdlxliff
+        content = """<?xml version="1.0" encoding="utf-8"?>
+<xliff xmlns:sdl="http://sdl.com/FileTypes/SdlXliff/1.0" xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2" sdl:version="1.0">
+  <file original="test.xml" datatype="x-sdlfilterframework2" source-language="en-US" target-language="pt-BR">
+    <body>
+      <!-- 1. Trans-unit estrutural com translate="no" e apenas tags de marcação -->
+      <trans-unit id="struct-1" translate="no">
+        <source><x id="0"/><x id="1"/></source>
+      </trans-unit>
+      <!-- 2. Trans-unit traduzida real com seg-source -->
+      <trans-unit id="trans-1">
+        <source>Engine control</source>
+        <seg-source>
+          <mrk mtype="seg" mid="1">Engine control</mrk>
+        </seg-source>
+        <target>
+          <mrk mtype="seg" mid="1">Controle do motor</mrk>
+        </target>
+        <sdl:seg-defs>
+          <sdl:seg id="1" conf="Translated" origin="tm" percent="100"/>
+        </sdl:seg-defs>
+      </trans-unit>
+      <!-- 3. Outra trans-unit estrutural que não deve inflar o contador para 50% -->
+      <trans-unit id="struct-2" translate="no">
+        <source><x id="2"/></source>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = os.path.join(tmp_dir, "test_structural.sdlxliff")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            segs = list(iter_sdlxliff(path))
+            # Deve ter exatamente 1 segmento traduzível, e 0 segmentos estruturais fantasmas
+            self.assertEqual(len(segs), 1)
+            self.assertEqual(segs[0].source, "Engine control")
+            self.assertEqual(segs[0].target, "Controle do motor")
+            self.assertEqual(segs[0].state, SegState.TRANSLATED)
+
+    def test_words_counting_and_model_editing(self):
+        """Verifica a contagem precisa de palavras e a edição direta in-cell no modelo da grelha."""
+        import tempfile
+        from ui.segments_model import SegmentsModel
+        from PySide6.QtCore import Qt
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = os.path.join(tmp_dir, "test_words.db")
+            tm = TranslationMemory(db_path)
+            segs = [
+                Segment(source="One two three four five", target="Um dois três quatro cinco", state=SegState.TRANSLATED),
+                Segment(source="Ten twenty thirty", target="", state=SegState.UNTRANSLATED),
+            ]
+            tm.add_many(segs, "en", "pt")
+            self.assertEqual(tm.total_words(), 8)
+            self.assertEqual(tm.translated_words(), 5)
+
+            model = SegmentsModel(tm)
+            self.assertEqual(model.flags(model.index(0, 1)) & Qt.ItemIsEditable, Qt.ItemIsEditable)
+            self.assertEqual(model.flags(model.index(0, 0)) & Qt.ItemIsEditable, Qt.NoItemFlags)
+
+            # Teste de edição direta na célula Tradução (coluna 1)
+            res = model.setData(model.index(1, 1), "Dez vinte trinta", Qt.EditRole)
+            self.assertTrue(res)
+            self.assertEqual(tm.count_translated(), 2)
+            self.assertEqual(tm.translated_words(), 8)
+            tm.close()
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestTradosFull)

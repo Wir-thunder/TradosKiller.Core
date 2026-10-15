@@ -18,7 +18,7 @@ from typing import Iterator, Optional
 
 from lxml import etree as ET
 
-from core.segment import Segment, SegState, SegOrigin, InlineTag, inline_token
+from core.segment import Segment, SegState, SegOrigin, InlineTag, inline_token, display_text
 
 XLIFF = "urn:oasis:names:tc:xliff:document:1.2"
 SDL = "http://sdl.com/FileTypes/SdlXliff/1.0"
@@ -172,14 +172,17 @@ def iter_sdlxliff(path: str) -> Iterator[Segment]:
                 order += 1
         else:
             # sem seg-source: usar source/target simples (XLIFF puro)
-            src_txt, src_tags = _plain(tu.find("x:source", N))
-            tgt_txt, tgt_tags = _plain(tu.find("x:target", N))
-            state = SegState.TRANSLATED if tgt_txt else SegState.UNTRANSLATED
-            yield Segment(
-                source=src_txt, target=tgt_txt, tu_id=tu_id, seg_id="",
-                state=state, source_tags=src_tags, target_tags=tgt_tags, order=order,
-            )
-            order += 1
+            # Ignora nós estruturais do Trados que contêm apenas tags/placeholders ou translate="no"
+            if tu.get("translate") != "no":
+                src_txt, src_tags = _plain(tu.find("x:source", N))
+                if display_text(src_txt).strip():
+                    tgt_txt, tgt_tags = _plain(tu.find("x:target", N))
+                    state = SegState.TRANSLATED if tgt_txt.strip() else SegState.UNTRANSLATED
+                    yield Segment(
+                        source=src_txt, target=tgt_txt, tu_id=tu_id, seg_id="",
+                        state=state, source_tags=src_tags, target_tags=tgt_tags, order=order,
+                    )
+                    order += 1
 
         tu.clear()
         while tu.getprevious() is not None:
