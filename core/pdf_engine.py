@@ -269,3 +269,4 @@ def reconstruct_pdf_translated(
         return os.path.exists(target_pdf_path)
     except Exception:
         return False
+

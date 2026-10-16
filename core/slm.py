@@ -43,24 +43,46 @@ class OllamaClient:
     def __init__(self, base_url: str = OLLAMA_BASE_URL) -> None:
         self.base_url = base_url.rstrip("/")
 
-    def is_available(self, timeout: float = 2.0) -> bool:
-        """Verifica se o servidor Ollama está em execução e respondendo."""
+    def _is_ollama_alive(self, timeout: float = 1.0) -> bool:
         try:
             r = requests.get(f"{self.base_url}/api/tags", timeout=timeout)
             return r.status_code == 200
         except Exception:
             return False
 
+    def is_available(self, timeout: float = 2.0) -> bool:
+        """Verifica se há algum motor SLM disponível (Embedded local in-process ou Ollama)."""
+        if self._is_ollama_alive(timeout=timeout):
+            return True
+        try:
+            from core.embedded_slm import EmbeddedSLMEngine
+            return EmbeddedSLMEngine.get_instance().is_available()
+        except Exception:
+            return False
+
     def list_models(self, timeout: float = 3.0) -> List[str]:
-        """Retorna os nomes dos modelos instalados no Ollama."""
+        """Retorna os nomes dos modelos instalados no Ollama e modelos .gguf locais da pasta models/."""
+        models: List[str] = []
         try:
             r = requests.get(f"{self.base_url}/api/tags", timeout=timeout)
             if r.status_code == 200:
-                models = r.json().get("models", [])
-                return [m.get("name", "") for m in models if m.get("name")]
+                o_models = r.json().get("models", [])
+                models.extend([m.get("name", "") for m in o_models if m.get("name")])
         except Exception:
             pass
-        return []
+
+        # Adiciona modelos GGUF locais embarcados encontrados no projeto ou disco
+        try:
+            from core.embedded_slm import EmbeddedSLMEngine
+            for m_path in EmbeddedSLMEngine.find_available_models():
+                base_f = os.path.basename(m_path)
+                emb_name = f"embedded:{base_f}"
+                if emb_name not in models:
+                    models.append(emb_name)
+        except Exception:
+            pass
+
+        return models
 
     def translate(
         self,
@@ -72,19 +94,30 @@ class OllamaClient:
         timeout: float = 60.0
     ) -> str:
         """
-        Executa a tradução de um segmento usando o modelo SLM do Ollama.
-        Suporta injeção dinâmica de termos de memória (RAG).
+        Executa a tradução de um segmento usando o motor SLM.
+        Prioriza o motor Embedded se solicitado ou se o servidor Ollama não estiver ativo.
         """
         clean_prompt = display_text(prompt).strip()
         if not clean_prompt:
             return ""
 
-        # Auto-resolução do modelo: se o modelo solicitado não existir mas houver modelos no Ollama, usa o disponível
+        # 1. Se for modelo embedded ou o Ollama não estiver em execução, usa o motor local in-process
+        if model.startswith("embedded") or not self._is_ollama_alive(timeout=1.0):
+            try:
+                from core.embedded_slm import EmbeddedSLMEngine
+                eng = EmbeddedSLMEngine.get_instance()
+                if eng.is_available():
+                    return eng.translate(clean_prompt, context_terms=context_terms, temperature=temperature)
+            except Exception as e:
+                pass
+
+        # 2. Executa via Ollama API
         target_model = model
         available_models = self.list_models()
         if available_models:
-            if target_model not in available_models and f"{target_model}:latest" not in available_models:
-                target_model = available_models[0]
+            ollama_only = [m for m in available_models if not m.startswith("embedded:")]
+            if ollama_only and target_model not in ollama_only and f"{target_model}:latest" not in ollama_only:
+                target_model = ollama_only[0]
 
         # Montagem do prompt com termos de contexto de memórias (se existirem)
         final_prompt = clean_prompt
@@ -111,7 +144,6 @@ class OllamaClient:
             r = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=timeout)
             if r.status_code == 200:
                 resp = r.json().get("response", "").strip()
-                # Remove eventuais prefixos automáticos como "Resposta:" ou aspas desnecessárias
                 for prefix in ("Resposta:", "Tradução:", "Resposta (Português):", "Tradução (Português):"):
                     if resp.startswith(prefix):
                         resp = resp[len(prefix):].strip()
@@ -119,22 +151,33 @@ class OllamaClient:
                     resp = resp[1:-1].strip()
                 return resp
             elif r.status_code == 404:
-                err_info = ""
+                # Tenta fallback para o motor embedded se o modelo Ollama não existir
                 try:
-                    err_info = r.json().get("error", "")
+                    from core.embedded_slm import EmbeddedSLMEngine
+                    eng = EmbeddedSLMEngine.get_instance()
+                    if eng.is_available():
+                        return eng.translate(clean_prompt, context_terms=context_terms)
                 except Exception:
                     pass
                 avail_str = ", ".join(available_models) if available_models else "nenhum"
                 return (
                     f"[Modelo '{target_model}' não encontrado no Ollama (HTTP 404). "
-                    f"Modelos instalados: {avail_str}. Acesse o SLM Studio para selecionar ou criar um modelo.]"
+                    f"Modelos disponíveis: {avail_str}. Acesse o SLM Studio para selecionar.]"
                 )
             else:
                 return f"[Erro Ollama HTTP {r.status_code}]"
         except requests.exceptions.Timeout:
             return "[Erro: Tempo limite do Ollama esgotado]"
         except requests.exceptions.ConnectionError:
-            return "[Erro: Não foi possível conectar ao Ollama (http://localhost:11434)]"
+            # Fallback transparente para o motor Embedded
+            try:
+                from core.embedded_slm import EmbeddedSLMEngine
+                eng = EmbeddedSLMEngine.get_instance()
+                if eng.is_available():
+                    return eng.translate(clean_prompt, context_terms=context_terms)
+            except Exception:
+                pass
+            return "[Erro: Não foi possível conectar ao Ollama e nenhum modelo .gguf local foi encontrado na pasta 'models/']"
         except Exception as e:
             return f"[Erro SLM: {str(e)}]"
 

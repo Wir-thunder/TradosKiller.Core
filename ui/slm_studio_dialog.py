@@ -371,6 +371,12 @@ class SLMStudioDialog(QDialog):
         self.spin_temp.setToolTip("0.1 para precisão técnica determinística; valores mais altos para maior criatividade")
         r1.addWidget(self.spin_temp)
 
+        btn_browse_gguf = QPushButton("📂 Selecionar .gguf...")
+        btn_browse_gguf.setStyleSheet("background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 8px;")
+        btn_browse_gguf.setToolTip("Carrega qualquer modelo .gguf local sem precisar do Ollama")
+        btn_browse_gguf.clicked.connect(self._browse_custom_gguf)
+        r1.addWidget(btn_browse_gguf)
+
         btn_save_config = QPushButton("💾 Definir como Padrão")
         btn_save_config.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; border-radius: 3px; padding: 4px 10px;")
         btn_save_config.clicked.connect(self._save_active_settings)
@@ -429,31 +435,67 @@ class SLMStudioDialog(QDialog):
     # OPERAÇÕES E SLOTS
     # -------------------------------------------------------------------------
     def _refresh_ollama_status(self) -> None:
-        """Atualiza a verificação do servidor Ollama e lista os modelos disponíveis."""
-        is_ok = self.client.is_available()
-        if is_ok:
+        """Atualiza a verificação do servidor Ollama e lista os modelos disponíveis (Ollama + Embedded GGUF)."""
+        is_alive = self.client._is_ollama_alive()
+        
+        from core.embedded_slm import EmbeddedSLMEngine
+        has_embedded = EmbeddedSLMEngine.get_instance().is_available()
+
+        if is_alive and has_embedded:
+            self.lbl_ollama_badge.setText("● Motor Híbrido: Embedded (Local) + Ollama")
+            self.lbl_ollama_badge.setStyleSheet("padding: 4px 10px; border-radius: 12px; font-weight: bold; background-color: #27ae60; color: white;")
+        elif has_embedded:
+            self.lbl_ollama_badge.setText("● SLM Embedded Ativa (100% Local In-Process)")
+            self.lbl_ollama_badge.setStyleSheet("padding: 4px 10px; border-radius: 12px; font-weight: bold; background-color: #2980b9; color: white;")
+        elif is_alive:
             self.lbl_ollama_badge.setText("● Ollama Online (11434)")
             self.lbl_ollama_badge.setStyleSheet("padding: 4px 10px; border-radius: 12px; font-weight: bold; background-color: #27ae60; color: white;")
-            models = self.client.list_models()
-
-            self.combo_base_model.clear()
-            self.combo_active_model.clear()
-
-            default_model = getattr(self.config, "ollama_model", "toyotao:latest")
-            target_idx = 0
-
-            for idx, m in enumerate(models):
-                self.combo_base_model.addItem(m)
-                self.combo_active_model.addItem(m)
-                if m == default_model or "toyotao" in m:
-                    target_idx = idx
-
-            if models:
-                self.combo_base_model.setCurrentIndex(target_idx)
-                self.combo_active_model.setCurrentIndex(target_idx)
         else:
-            self.lbl_ollama_badge.setText("○ Ollama Desconectado")
+            self.lbl_ollama_badge.setText("○ Sem Motor SLM (Selecione um .gguf)")
             self.lbl_ollama_badge.setStyleSheet("padding: 4px 10px; border-radius: 12px; font-weight: bold; background-color: #c0392b; color: white;")
+
+        models = self.client.list_models()
+        self.combo_base_model.clear()
+        self.combo_active_model.clear()
+
+        default_model = getattr(self.config, "ollama_model", "toyotao:latest")
+        target_idx = 0
+
+        for idx, m in enumerate(models):
+            self.combo_base_model.addItem(m)
+            self.combo_active_model.addItem(m)
+            if m == default_model or "trados-slm" in m or "toyotao" in m:
+                target_idx = idx
+
+        if models:
+            self.combo_base_model.setCurrentIndex(target_idx)
+            self.combo_active_model.setCurrentIndex(target_idx)
+
+    def _browse_custom_gguf(self) -> None:
+        """Permite selecionar manualmente qualquer ficheiro .gguf para uso embarcado."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar Modelo GGUF Local",
+            "",
+            "Modelos GGUF (*.gguf);;Todos os Ficheiros (*.*)"
+        )
+        if file_path:
+            from core.embedded_slm import EmbeddedSLMEngine
+            eng = EmbeddedSLMEngine.get_instance()
+            ok = eng.load_model(file_path)
+            if ok:
+                name = f"embedded:{os.path.basename(file_path)}"
+                if self.combo_active_model.findText(name) == -1:
+                    self.combo_active_model.addItem(name)
+                self.combo_active_model.setCurrentText(name)
+                self.config.ollama_model = name
+                self._refresh_ollama_status()
+                QMessageBox.information(
+                    self,
+                    "Modelo Embedded Carregado",
+                    f"Modelo GGUF carregado diretamente em memória com sucesso:\n{os.path.basename(file_path)}\n\n"
+                    "O TradosKiller está agora utilizando este modelo in-process sem necessidade de Ollama externo."
+                )
 
     def _scan_d_drive_sdltms(self) -> None:
         r"""Varre automaticamente a pasta D:\ e D:\aa_Memórias_Toyota_GWM_DYC procurando memórias."""

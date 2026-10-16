@@ -1076,6 +1076,30 @@ class TestTradosFull(unittest.TestCase):
         self.assertIn("internacional", cleaned)
         self.assertNotIn("   ", cleaned)
 
+    def test_embedded_slm_engine(self):
+        """Verifica o motor SLM embedded local in-process."""
+        from core.embedded_slm import EmbeddedSLMEngine
+        from core.slm import OllamaClient
+
+        self.assertTrue(EmbeddedSLMEngine.is_engine_installed())
+        eng = EmbeddedSLMEngine.get_instance()
+        models = eng.find_available_models()
+        self.assertGreaterEqual(len(models), 1)
+
+        # Higienização de saída do modelo
+        clean1 = eng._clean_model_output("A tradução é: Cabo negativo desconectado.")
+        self.assertEqual(clean1, "Cabo negativo desconectado.")
+
+        clean2 = eng._clean_model_output('"Texto entre aspas"')
+        self.assertEqual(clean2, "Texto entre aspas")
+
+        # Integração do cliente unificado
+        client = OllamaClient()
+        self.assertTrue(client.is_available())
+        all_models = client.list_models()
+        has_embedded = any(m.startswith("embedded:") for m in all_models)
+        self.assertTrue(has_embedded)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestTradosFull)

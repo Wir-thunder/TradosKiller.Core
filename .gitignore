@@ -59,6 +59,10 @@ venv.bak/
 Thumbs.db
 desktop.ini
 
+# Large model weights (Embedded SLM GGUFs)
+*.gguf
+models/*.gguf
+
 # Logs
 *.log
 
