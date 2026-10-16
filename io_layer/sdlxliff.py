@@ -153,9 +153,9 @@ def iter_sdlxliff(path: str) -> Iterator[Segment]:
 
         src_mrks = list(_iter_seg_mrks(seg_source)) if seg_source is not None else []
         if src_mrks:
-            for mrk in src_mrks:
-                mid = mrk.get("mid") or ""
                 src_txt, src_tags = _mrk_text_with_tags(mrk)
+                if not display_text(src_txt).strip():
+                    continue
                 tgt_mrk = tgt_by_mid.get(mid)
                 tgt_txt, tgt_tags = _mrk_text_with_tags(tgt_mrk) if tgt_mrk is not None else ("", [])
                 if mid in meta:

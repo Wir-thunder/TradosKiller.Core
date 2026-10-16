@@ -215,8 +215,11 @@ class TranslationMemory:
 
         try:
             for seg in segs:
+                clean_src = display_text(seg.source).strip()
+                if not clean_src:
+                    continue
                 seg_order = seg.order if seg.order != 0 else (base_order + total_inserted + len(batch))
-                words = len(display_text(seg.source).split())
+                words = len(clean_src.split())
                 batch.append((
                     seg.tu_id, seg.seg_id, seg.source, seg.target,
                     seg.state.value, seg.origin.value, seg.percent, srclang, tgtlang,

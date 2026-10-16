@@ -302,6 +302,8 @@ class EditorScreen(QWidget):
             }
         """)
         stats_layout.addWidget(self._progress_bar)
+        self.stats_frame = stats_frame
+        self.stats_frame.setVisible(False)
         layout.addWidget(stats_frame)
 
         # ---------------- Advanced Display Filter 2.0 (Trados Studio ADF)
@@ -314,10 +316,12 @@ class EditorScreen(QWidget):
         layout.addWidget(self.adv_filter)
 
         # ---------------- Splitter principal Vertical (Layout Oficial Trados Studio)
-        splitter = QSplitter(Qt.Vertical)
+        self.main_splitter = QSplitter(Qt.Vertical)
+        splitter = self.main_splitter
 
         # 1. Painel Superior: Translation Results (TM Matches, Concordância, SLM Neural)
-        results_panel = QFrame()
+        self.results_panel = QFrame()
+        results_panel = self.results_panel
         results_panel.setStyleSheet("background-color: #202022; border: 1px solid #333333; border-radius: 4px;")
         rf_layout = QVBoxLayout(results_panel)
         rf_layout.setContentsMargins(8, 4, 8, 4)
@@ -338,6 +342,17 @@ class EditorScreen(QWidget):
         rf_header.addWidget(self.lbl_attached_tm)
 
         rf_header.addStretch()
+
+        self.btn_toggle_results = QPushButton("▲ Ocultar Painel (Alt+1)")
+        self.btn_toggle_results.setStyleSheet("""
+            QPushButton {
+                background-color: transparent; color: #888888; border: 1px solid #444;
+                border-radius: 3px; padding: 2px 8px; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #333; color: white; }
+        """)
+        self.btn_toggle_results.clicked.connect(self.toggle_results_panel)
+        rf_header.addWidget(self.btn_toggle_results)
 
         btn_apply_match = QPushButton("Aplicar Tradução (Ctrl+T)")
         btn_apply_match.setStyleSheet("""
@@ -522,10 +537,20 @@ class EditorScreen(QWidget):
         QShortcut(QKeySequence("F8"), self, self.show_xbench_qa)
         QShortcut(QKeySequence("Ctrl+Alt+M"), self, self.merge_with_next_segment)
         QShortcut(QKeySequence("Ctrl+Alt+S"), self, self.split_current_segment)
-        QShortcut(QKeySequence("Ctrl+S"), self, self.save_current)
         QShortcut(QKeySequence("Alt+F8"), self, self.show_project_settings)
         QShortcut(QKeySequence("Ctrl+T"), self, self._apply_best_match)
         QShortcut(QKeySequence("Ctrl+G"), self, self.translate_current_with_slm)
+        QShortcut(QKeySequence("Alt+1"), self, self.toggle_results_panel)
+
+    def toggle_results_panel(self) -> None:
+        """Alterna a visibilidade do painel de Resultados de Tradução para despoluir a tela (Alt+1)."""
+        vis = not self.results_panel.isVisible()
+        self.results_panel.setVisible(vis)
+        self.btn_toggle_results.setText("▲ Ocultar Painel (Alt+1)" if vis else "▼ Mostrar Resultados (Alt+1)")
+        if vis:
+            self.main_splitter.setSizes([90, 520, 140])
+        else:
+            self.main_splitter.setSizes([0, 620, 140])
 
     # ------------------------------------------------------------- Localizar & Substituir
     def show_find(self) -> None:
