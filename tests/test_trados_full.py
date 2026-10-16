@@ -976,6 +976,106 @@ class TestTradosFull(unittest.TestCase):
             self.assertEqual(tm.translated_words(), 8)
             tm.close()
 
+    def test_universal_file_importer(self):
+        """Verifica a conversão universal de arquivos de texto/office para SDLXLIFF traduzível."""
+        import tempfile
+        from core.file_importer import (
+            is_cat_native_file,
+            convert_to_sdlxliff,
+            SUPPORTED_FORMATS,
+        )
+
+        self.assertTrue(is_cat_native_file("test.sdlxliff"))
+        self.assertTrue(is_cat_native_file("test.sdltm"))
+        self.assertTrue(is_cat_native_file("test.sdlproj"))
+        self.assertFalse(is_cat_native_file("test.docx"))
+        self.assertFalse(is_cat_native_file("test.txt"))
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # 1. Arquivo de texto puro
+            txt_path = os.path.join(tmp_dir, "documento_teste.txt")
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write("Primeiro parágrafo do documento de teste.\n\nSegundo parágrafo com duas frases. Aqui está a segunda frase.")
+
+            sdlxliff_out, seg_count = convert_to_sdlxliff(txt_path, src_lang="pt-BR", tgt_lang="en-US")
+            self.assertTrue(os.path.exists(sdlxliff_out))
+            self.assertTrue(sdlxliff_out.endswith(".sdlxliff"))
+            self.assertGreaterEqual(seg_count, 2)
+
+            segs = list(iter_sdlxliff(sdlxliff_out))
+            self.assertGreaterEqual(len(segs), 2)
+            self.assertIn("Primeiro parágrafo", segs[0].source)
+            self.assertEqual(segs[0].target, "")
+            self.assertEqual(segs[0].state, SegState.UNTRANSLATED)
+
+            # 2. Arquivo Markdown
+            md_path = os.path.join(tmp_dir, "readme.md")
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write("# Título do Guia\n\nEste é um guia rápido para tradutores profissionais.")
+
+            sdlxliff_md, md_count = convert_to_sdlxliff(md_path, src_lang="pt-BR", tgt_lang="es-ES")
+            self.assertTrue(os.path.exists(sdlxliff_md))
+            self.assertGreaterEqual(md_count, 1)
+            segs_md = list(iter_sdlxliff(sdlxliff_md))
+            self.assertGreaterEqual(len(segs_md), 1)
+
+    def test_quick_start_dialog_and_welcome_screen(self):
+        """Verifica a inicialização da tela Welcome e do diálogo QuickStart sem erros de UI."""
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance() or QApplication([])
+
+        from ui.screens.welcome_screen import WelcomeScreen
+        from ui.quick_start_dialog import QuickStartDialog
+
+        welcome = WelcomeScreen()
+        self.assertIsNotNone(welcome.drop_zone)
+
+        dialog = QuickStartDialog(
+            file_path="C:\\sample\\test_file.docx",
+            segment_count=42,
+            default_src_lang="en-US",
+            default_tgt_lang="pt-BR"
+        )
+        self.assertEqual(dialog.source_lang, "en-US")
+        self.assertEqual(dialog.target_lang, "pt-BR")
+        self.assertFalse(dialog.confirmed)
+
+        # Test TM addition with an existing file
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".sdltm", delete=False) as tf:
+            tm_temp = tf.name
+        try:
+            dialog._add_tm_path(tm_temp)
+            self.assertIn(tm_temp, dialog.selected_tms)
+        finally:
+            if os.path.exists(tm_temp):
+                os.remove(tm_temp)
+
+    def test_pdf_engine_and_tofu_detection(self):
+        """Verifica detecção de tofu/caracteres corrompidos e motor limpo de PDF."""
+        from core.pdf_engine import is_text_garbled_or_tofu, clean_extracted_text
+
+        # 1. Casos com tofu e lixo de CMap corrompido (como visto na imagem do usuário)
+        sample_tofu = "Install SanDisk Software □□□□□□□□□□□□□□□□□□□□"
+        sample_garbled = "* □□□□□X□□XYa□c□ ¡□¢m£¥f§¤'a"
+        self.assertTrue(is_text_garbled_or_tofu(sample_tofu))
+        self.assertTrue(is_text_garbled_or_tofu(sample_garbled))
+
+        # 2. Casos normais e texto limpo
+        sample_clean_en = "Install SanDisk Software on your desktop or portable drive."
+        sample_clean_zh = "简体中文: 软件安装说明"
+        sample_clean_pt = "Instalação do Software no seu computador."
+        self.assertFalse(is_text_garbled_or_tofu(sample_clean_en))
+        self.assertFalse(is_text_garbled_or_tofu(sample_clean_zh))
+        self.assertFalse(is_text_garbled_or_tofu(sample_clean_pt))
+
+        # 3. Higienização de texto
+        dirty_text = "Palavra inter-\nnacional com espaço   extra e □ tofu."
+        cleaned = clean_extracted_text(dirty_text)
+        self.assertNotIn("□", cleaned)
+        self.assertIn("internacional", cleaned)
+        self.assertNotIn("   ", cleaned)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestTradosFull)

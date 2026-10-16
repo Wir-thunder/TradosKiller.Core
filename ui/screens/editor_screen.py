@@ -183,7 +183,10 @@ class EditorScreen(QWidget):
         self.attached_tms: list[AttachedTMConfig] = []
         self._slm_client = OllamaClient()
         cfg = load_config()
-        self._active_slm_model = getattr(cfg, "ollama_model", "toyotao:latest")
+        configured_model = getattr(cfg, "ollama_model", "toyotao:latest")
+        if configured_model in ("llama3.2", "llama3"):
+            configured_model = "toyotao:latest"
+        self._active_slm_model = configured_model
         self._auto_slm_suggest = True
         self._slm_worker: Optional[SLMTranslateWorker] = None
         self._slm_lookup_worker: Optional[SLMSuggestionWorker] = None

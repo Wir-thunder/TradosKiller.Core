@@ -79,6 +79,13 @@ class OllamaClient:
         if not clean_prompt:
             return ""
 
+        # Auto-resolução do modelo: se o modelo solicitado não existir mas houver modelos no Ollama, usa o disponível
+        target_model = model
+        available_models = self.list_models()
+        if available_models:
+            if target_model not in available_models and f"{target_model}:latest" not in available_models:
+                target_model = available_models[0]
+
         # Montagem do prompt com termos de contexto de memórias (se existirem)
         final_prompt = clean_prompt
         if context_terms:
@@ -89,7 +96,7 @@ class OllamaClient:
             )
 
         payload = {
-            "model": model,
+            "model": target_model,
             "prompt": final_prompt,
             "stream": False,
             "options": {
@@ -111,6 +118,17 @@ class OllamaClient:
                 if (resp.startswith('"') and resp.endswith('"')) or (resp.startswith("'") and resp.endswith("'")):
                     resp = resp[1:-1].strip()
                 return resp
+            elif r.status_code == 404:
+                err_info = ""
+                try:
+                    err_info = r.json().get("error", "")
+                except Exception:
+                    pass
+                avail_str = ", ".join(available_models) if available_models else "nenhum"
+                return (
+                    f"[Modelo '{target_model}' não encontrado no Ollama (HTTP 404). "
+                    f"Modelos instalados: {avail_str}. Acesse o SLM Studio para selecionar ou criar um modelo.]"
+                )
             else:
                 return f"[Erro Ollama HTTP {r.status_code}]"
         except requests.exceptions.Timeout:

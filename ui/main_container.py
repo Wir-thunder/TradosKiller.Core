@@ -14,21 +14,24 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette, QFont
+from PySide6.QtGui import QColor, QPalette, QFont, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFrame, QStackedWidget, QFileDialog, QMessageBox, QStatusBar
 )
 
 from ui.ribbon import RibbonBar
+from ui.screens.welcome_screen import WelcomeScreen
 from ui.screens.projects_screen import ProjectsScreen
 from ui.screens.files_screen import FilesScreen
 from ui.screens.editor_screen import EditorScreen
 from ui.screens.tm_screen import TmScreen
+from ui.quick_start_dialog import QuickStartDialog
 from ui.xbench_dialog import XbenchQADialog
 from ui.tm_utility_dialog import TmManagementUtilityDialog
 from core.segment import SegState
 from core.project import Project, is_project_file
+from core.file_importer import convert_to_sdlxliff, is_supported_file
 from io_layer.sdlproj import parse_sdlproj, is_sdlproj_file
 from io_layer.sdlpackage import is_sdlpackage, extract_package, create_return_package
 
@@ -91,6 +94,7 @@ class MainContainer(QMainWindow):
         self.setWindowTitle("CAT Tool — Professional RWS Trados Translation Workspace")
         self.resize(1440, 920)
         self.setMinimumSize(900, 600)
+        self.setAcceptDrops(True)
         
         self._current_project: Optional[Project] = None
         
@@ -189,46 +193,15 @@ class MainContainer(QMainWindow):
         self.status_bar = QStatusBar()
         self.status_bar.setStyleSheet("background-color: #007acc; color: white; font-size: 10px; font-weight: bold;")
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("CAT Tool pronta — Carregue um ficheiro ou projeto SDL para começar.")
+        self.status_bar.showMessage("TradosKiller pronto — Arraste qualquer ficheiro para traduzir.")
 
-        self._navigate_to("editor")
+        self._navigate_to("welcome")
 
     def _create_screens(self) -> None:
         """Cria as telas integradas da aplicação."""
-        # 0. Welcome
-        welcome = QWidget()
-        wl = QVBoxLayout(welcome)
-        wl.setContentsMargins(40, 40, 40, 40)
-        wl.setSpacing(16)
-
-        w_title = QLabel("SDL Trados Studio Workspace — CAT Tool")
-        w_title.setStyleSheet("font-size: 24px; font-weight: bold; color: #8eb4f3;")
-        wl.addWidget(w_title)
-
-        w_desc = QLabel(
-            "Ambiente de alta performance otimizado para o ecossistema RWS / SDL Trados:\n\n"
-            "• Compatibilidade direta com bases de memória nativas (.sdltm) e bilingues (.sdlxliff)\n"
-            "• Suporte a pacotes de projeto (.sdlppx) e geração de pacotes de retorno (.sdlrpx)\n"
-            "• Ribbon Bar com atalhos de produtividade: Confirm & Next (Ctrl+Enter), Aprovar, Rejeitar\n"
-            "• Localizar e Substituir instantâneo com atalhos (Ctrl+F / Ctrl+H)\n"
-            "• Review Bar com contadores em tempo real para controle de qualidade rigoroso"
-        )
-        w_desc.setStyleSheet("color: #cccccc; font-size: 13px; line-height: 1.6;")
-        wl.addWidget(w_desc)
-
-        btn_start_editor = QPushButton("Abrir Editor de Tradução ➔")
-        btn_start_editor.setStyleSheet("""
-            QPushButton {
-                background-color: #007acc; color: white; font-weight: bold;
-                border: none; border-radius: 4px; padding: 10px 20px; font-size: 13px; max-width: 250px;
-            }
-            QPushButton:hover { background-color: #1c97ea; }
-        """)
-        btn_start_editor.clicked.connect(lambda: self._navigate_to("editor"))
-        wl.addWidget(btn_start_editor)
-
-        wl.addStretch()
-        self.stack.addWidget(welcome)
+        # 0. Welcome Screen (Drag & Drop Universal Hub)
+        self.welcome_screen = WelcomeScreen()
+        self.stack.addWidget(self.welcome_screen)
 
         # 1. Projects
         self.projects_screen = ProjectsScreen()
@@ -256,6 +229,11 @@ class MainContainer(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Conecta todos os sinais do Ribbon e das telas."""
+        # Welcome Screen
+        self.welcome_screen.file_selected.connect(self._handle_universal_file_import)
+        self.welcome_screen.open_project_requested.connect(self.projects_screen._open_project_dialog)
+        self.welcome_screen.open_tm_requested.connect(lambda: self._navigate_to("tm"))
+
         self.projects_screen.project_opened.connect(self._on_project_opened)
         self.projects_screen.file_opened.connect(self._open_specific_file)
         self.files_screen.open_file_in_editor.connect(self._open_specific_file)
@@ -355,27 +333,132 @@ class MainContainer(QMainWindow):
             self._navigate_to("editor")
         self.editor_screen.reset_display_filter()
 
-    # ------------------------------------------------------------- Gestão de Ficheiros & Pacotes
+    # ------------------------------------------------------------- Gestão de Ficheiros, Documentos & Pacotes
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                p = url.toLocalFile()
+                if is_supported_file(p):
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        for url in event.mimeData().urls():
+            p = url.toLocalFile()
+            if is_supported_file(p):
+                event.acceptProposedAction()
+                self._handle_universal_file_import(p)
+                return
+
     def _open_file_dialog(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Abrir Ficheiro de Tradução", "",
+        filter_str = (
+            "Todos os Formatos Suportados (*.docx *.xlsx *.pptx *.pdf *.png *.jpg *.jpeg *.tiff *.bmp *.txt *.html *.xml *.json *.csv *.sdlxliff *.tmx *.sdltm *.sdlproj *.sdlppx);;"
+            "Documentos Office (*.docx *.xlsx *.pptx);;"
+            "PDF e Imagens OCR (*.pdf *.png *.jpg *.jpeg *.tiff *.bmp);;"
             "Ficheiros RWS & CAT (*.sdlxliff *.sdltm *.sdlproj *.sdlppx *.sdlrpx *.tmx *.catproj *.xlf *.xliff);;"
-            "SDLXLIFF (*.sdlxliff);;SDL TM (*.sdltm);;Projetos SDL (*.sdlproj);;Pacotes SDL (*.sdlppx *.sdlrpx);;TMX (*.tmx);;Todos (*.*)"
+            "Todos os Ficheiros (*.*)"
         )
-        if not path:
+        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Ficheiro para Traduzir", "", filter_str)
+        if path:
+            self._handle_universal_file_import(path)
+
+    def _handle_universal_file_import(self, path: str) -> None:
+        """
+        Ponto de entrada universal para qualquer ficheiro arrastado ou selecionado.
+        - Se for projeto/pacote (.sdlproj, .sdlppx, .catproj): abre o projeto
+        - Se for memória (.sdltm, .tmx): abre para edição ou associa
+        - Se for bilingue (.sdlxliff, .xlf, .xliff): abre diálogo de configuração rápida / associação de TM
+        - Se for documento ou arquivo fonte (.docx, .xlsx, .pptx, .pdf, imagem OCR, .txt, etc.):
+          Converte para .sdlxliff, abre diálogo de associação de TM e inicia tradução no Editor!
+        """
+        if not path or not os.path.exists(path):
             return
 
+        ext = os.path.splitext(path)[1].lower()
+
+        # 1. Pacotes e Projetos Trados
         if is_sdlpackage(path):
             self._load_sdlpackage(path)
+            return
         elif is_sdlproj_file(path):
             self._load_sdlproj(path)
+            return
         elif is_project_file(path):
             proj = Project.load(path)
             self._on_project_opened(proj)
-        else:
-            self.editor_screen.load_file(path)
+            return
+
+        # 2. Arquivo de Memória direto (.sdltm, .tmx)
+        if ext in (".sdltm", ".tmx"):
+            if self.editor_screen.tm and self.editor_screen.tm.count() > 0:
+                self.editor_screen.attach_tm(path)
+                self._navigate_to("editor")
+                self.status_bar.showMessage(f"Memória de Tradução associada: {os.path.basename(path)}")
+            else:
+                self.tm_screen.load_tm_file(path)
+                self._navigate_to("tm")
+                self.status_bar.showMessage(f"Memória de Tradução aberta para edição: {os.path.basename(path)}")
+            return
+
+        # 3. Arquivo Bilingue já no formato SDLXLIFF / XLIFF
+        if ext in (".sdlxliff", ".xlf", ".xliff"):
+            dialog = QuickStartDialog(
+                file_path=path,
+                segment_count=0,
+                default_src_lang="en-US",
+                default_tgt_lang="pt-BR",
+                parent=self
+            )
+            if dialog.exec() and dialog.confirmed:
+                for tm_p in dialog.selected_tms:
+                    self.editor_screen.attach_tm(tm_p)
+                self.editor_screen._auto_slm_suggest = dialog.use_slm
+                self.editor_screen.load_file(path)
+                self._navigate_to("editor")
+                self.status_bar.showMessage(f"Ficheiro {os.path.basename(path)} aberto no Editor.")
+            return
+
+        # 4. Documentos externos (.docx, .xlsx, .pptx, .pdf, imagens com OCR, .txt, .html, .xml, etc.)
+        self.status_bar.showMessage(f"A converter {os.path.basename(path)} para SDLXLIFF...")
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            sdlxliff_path, seg_count = convert_to_sdlxliff(path, src_lang="en-US", tgt_lang="pt-BR")
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Erro na Conversão", f"Não foi possível converter o arquivo para SDLXLIFF:\n{e}")
+            return
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        # Abre o diálogo pedindo para associar TM e definir idiomas
+        dialog = QuickStartDialog(
+            file_path=path,
+            segment_count=seg_count,
+            default_src_lang="en-US",
+            default_tgt_lang="pt-BR",
+            parent=self
+        )
+        if dialog.exec() and dialog.confirmed:
+            if dialog.source_lang != "en-US" or dialog.target_lang != "pt-BR":
+                try:
+                    sdlxliff_path, seg_count = convert_to_sdlxliff(
+                        path,
+                        src_lang=dialog.source_lang,
+                        tgt_lang=dialog.target_lang
+                    )
+                except Exception:
+                    pass
+
+            for tm_p in dialog.selected_tms:
+                self.editor_screen.attach_tm(tm_p)
+
+            self.editor_screen._auto_slm_suggest = dialog.use_slm
+            self.editor_screen.load_file(sdlxliff_path)
             self._navigate_to("editor")
-            self.status_bar.showMessage(f"Ficheiro carregado: {os.path.basename(path)}")
+            self.status_bar.showMessage(
+                f"Ficheiro {os.path.basename(path)} ({seg_count:,} segmentos) convertido para SDLXLIFF e pronto para traduzir!"
+            )
 
     def _open_sdlproj_dialog(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

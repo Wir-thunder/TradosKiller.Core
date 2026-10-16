@@ -12,6 +12,7 @@ class Config:
     """Application configuration."""
     recent_files: List[str] = field(default_factory=list)
     recent_projects: List[str] = field(default_factory=list)
+    recent_tms: List[str] = field(default_factory=list)
     max_recent_files: int = 10
     
     # Idiomas padrão
@@ -31,7 +32,7 @@ class Config:
     
     # Integração de Pré-tradução Neural (SLMs Locais)
     ollama_enabled: bool = False
-    ollama_model: str = "llama3.2" # Ou phi3, mistral, etc.
+    ollama_model: str = "toyotao:latest"
     ollama_endpoint: str = "http://localhost:11434/api/generate"
     
     def add_recent_file(self, path: str) -> None:
@@ -48,6 +49,7 @@ class Config:
         return {
             "recent_files": self.recent_files,
             "recent_projects": self.recent_projects,
+            "recent_tms": self.recent_tms,
             "max_recent_files": self.max_recent_files,
             "default_source_lang": self.default_source_lang,
             "default_target_lang": self.default_target_lang,
@@ -63,9 +65,13 @@ class Config:
     
     @classmethod
     def from_dict(cls, data: dict) -> "Config":
+        saved_model = data.get("ollama_model", "toyotao:latest")
+        if saved_model == "llama3.2":
+            saved_model = "toyotao:latest"
         return cls(
             recent_files=data.get("recent_files", []),
             recent_projects=data.get("recent_projects", []),
+            recent_tms=data.get("recent_tms", []),
             max_recent_files=data.get("max_recent_files", 10),
             default_source_lang=data.get("default_source_lang", "en-US"),
             default_target_lang=data.get("default_target_lang", "pt-PT"),
@@ -75,7 +81,7 @@ class Config:
             spell_check_enabled=data.get("spell_check_enabled", True),
             languagetool_endpoint=data.get("languagetool_endpoint", "http://localhost:8081"),
             ollama_enabled=data.get("ollama_enabled", False),
-            ollama_model=data.get("ollama_model", "llama3.2"),
+            ollama_model=saved_model,
             ollama_endpoint=data.get("ollama_endpoint", "http://localhost:11434/api/generate"),
         )
     
