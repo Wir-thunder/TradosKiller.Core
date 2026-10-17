@@ -1100,12 +1100,30 @@ class TestTradosFull(unittest.TestCase):
         has_embedded = any(m.startswith("embedded:") for m in all_models)
         self.assertTrue(has_embedded)
 
+    def test_create_empty_sdltm_and_schema(self):
+        """Verifica a criação de nova memória .sdltm vazia e conformidade do schema SQLite."""
+        import tempfile
+        from io_layer.sdltm import create_empty_sdltm, detect_sdltm_langs, iter_sdltm
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            sdltm_path = os.path.join(tmp_dir, "TesteMemoria.sdltm")
+            res_path = create_empty_sdltm(sdltm_path, src_lang="en-US", tgt_lang="pt-BR", name="TesteMemoria")
+            self.assertTrue(os.path.exists(res_path))
+            
+            # Verificar pares de idioma
+            src, tgt = detect_sdltm_langs(res_path)
+            self.assertEqual(src, "en-US")
+            self.assertEqual(tgt, "pt-BR")
+
+            # Itera memória vazia sem erros
+            units = list(iter_sdltm(res_path, src, tgt))
+            self.assertEqual(len(units), 0)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestTradosFull)
     runner = unittest.TextTestRunner(verbosity=2)
     res = runner.run(suite)
-    sys.exit(0 if res.wasSuccessful() else 1)
+    os._exit(0 if res.wasSuccessful() else 1)
 
 
 

@@ -151,6 +151,7 @@ class RibbonBar(QWidget):
     display_filter_reset = Signal()
     tm_utility_requested = Signal()
     tm_editor_requested = Signal()
+    create_sdltm_requested = Signal()
     advanced_filter_requested = Signal()
     batch_tasks_requested = Signal(str) # "wizard", "analyze", "pretranslate", "verify", "update_tm"
     explore_folder_requested = Signal()
@@ -452,6 +453,14 @@ class RibbonBar(QWidget):
         grp_qa.add_widget(btn_slm_studio)
         lh.addWidget(grp_qa)
 
+        # Grupo: Memórias de Tradução
+        grp_tm_proj = RibbonGroup("Memórias")
+        btn_create_tm_proj = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória SDL Trados Studio")
+        btn_create_tm_proj.setStyleSheet("color: #93c5fd; font-weight: bold;")
+        btn_create_tm_proj.clicked.connect(self.create_sdltm_requested.emit)
+        grp_tm_proj.add_widget(btn_create_tm_proj)
+        lh.addWidget(grp_tm_proj)
+
         lh.addStretch()
         self._add_tab("Início (Projetos)", tab_home)
 
@@ -632,10 +641,10 @@ class RibbonBar(QWidget):
         col_tm.setSpacing(2)
         btn_concordance = RibbonSmallButton("📖", "Concordância (F3)", "Pesquisa profunda na base da TM")
         btn_concordance.clicked.connect(self.concordance_requested.emit)
-        btn_save = RibbonSmallButton("💾", "Gravar (Ctrl+S)", "Grava e atualiza a TM")
-        btn_save.clicked.connect(self.save_file_requested.emit)
+        btn_new_sdltm = RibbonSmallButton("➕", "Nova TM (.sdltm)", "Criar nova base de memória SDLTM")
+        btn_new_sdltm.clicked.connect(self.create_sdltm_requested.emit)
         col_tm.addWidget(btn_concordance)
-        col_tm.addWidget(btn_save)
+        col_tm.addWidget(btn_new_sdltm)
         grp_tm.add_layout(col_tm)
 
         btn_slm = RibbonButton("🤖", "SLM\n(Ctrl+G)", "Traduzir segmento com SLM Neural especializada (Ctrl+G)")
@@ -994,6 +1003,11 @@ class RibbonBar(QWidget):
         lt.setSpacing(0)
 
         grp_tm_maint = RibbonGroup("Trados TM Management Utility")
+        btn_create_tm_v = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória SDLTM vazia")
+        btn_create_tm_v.setStyleSheet("color: #93c5fd; font-weight: bold;")
+        btn_create_tm_v.clicked.connect(self.create_sdltm_requested.emit)
+        grp_tm_maint.add_widget(btn_create_tm_v)
+
         btn_tm_util = RibbonButton("🛠", "Utilitário\nTM", "Compactar, desduplicar e manter TMs (.sdltm)")
         btn_tm_util.clicked.connect(self.tm_utility_requested.emit)
         grp_tm_maint.add_widget(btn_tm_util)
@@ -1047,6 +1061,11 @@ class RibbonBar(QWidget):
         lt.setSpacing(0)
 
         grp_tm_ops = RibbonGroup("Base de Dados SDLTM")
+        btn_new_sdltm = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar uma nova memória RWS Trados .sdltm vazia")
+        btn_new_sdltm.setStyleSheet("color: #93c5fd; font-weight: bold;")
+        btn_new_sdltm.clicked.connect(self.create_sdltm_requested.emit)
+        grp_tm_ops.add_widget(btn_new_sdltm)
+
         btn_open_sdltm = RibbonButton("📂", "Abrir .sdltm\n(Trados TM)", "Carregar memória nativa do RWS Trados")
         btn_open_sdltm.clicked.connect(self.open_file_requested.emit)
         grp_tm_ops.add_widget(btn_open_sdltm)
@@ -1093,6 +1112,11 @@ class RibbonBar(QWidget):
         btn_new = RibbonButton("✨", "Novo\nProjeto", "Criar um novo projeto de tradução")
         btn_new.clicked.connect(self.new_project_requested.emit)
         grp_start.add_widget(btn_new)
+
+        btn_new_tm = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória SDL Trados")
+        btn_new_tm.setStyleSheet("color: #93c5fd; font-weight: bold;")
+        btn_new_tm.clicked.connect(self.create_sdltm_requested.emit)
+        grp_start.add_widget(btn_new_tm)
 
         btn_open = RibbonButton("📂", "Abrir...\n(Ctrl+O)", "Abrir ficheiro de tradução bilingue")
         btn_open.clicked.connect(self.open_file_requested.emit)

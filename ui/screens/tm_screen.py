@@ -78,7 +78,25 @@ class TmScreen(QWidget):
         load_label.setStyleSheet("font-weight: bold; color: #ddd;")
         left_layout.addWidget(load_label)
         
-        btn_load = QPushButton("Load TMX/SDLXLIFF")
+        btn_create = QPushButton("➕ Nova Memória (.sdltm)")
+        btn_create.setStyleSheet("""
+            QPushButton {
+                background-color: #1e3a5f;
+                color: #93c5fd;
+                border: 1px solid #3b82f6;
+                border-radius: 4px;
+                padding: 8px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2563eb;
+                color: white;
+            }
+        """)
+        btn_create.clicked.connect(self._create_new_sdltm)
+        left_layout.addWidget(btn_create)
+
+        btn_load = QPushButton("Load TMX/SDLXLIFF/SDLTM")
         btn_load.setStyleSheet("""
             QPushButton {
                 background-color: #3dae73;
@@ -357,6 +375,13 @@ class TmScreen(QWidget):
         
         layout.addWidget(splitter)
     
+    def _create_new_sdltm(self) -> None:
+        """Abre diálogo para criar uma nova memória .sdltm vazia e a carrega."""
+        from ui.create_sdltm_dialog import CreateSdltmDialog
+        dlg = CreateSdltmDialog(default_src=self._src_lang, default_tgt=self._tgt_lang, parent=self)
+        if dlg.exec() and dlg.created_path:
+            self.load_tm_file(dlg.created_path)
+
     def _load_file(self) -> None:
         """Load a translation memory file."""
         path, _ = QFileDialog.getOpenFileName(

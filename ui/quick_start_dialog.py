@@ -243,6 +243,17 @@ class QuickStartDialog(QDialog):
         btn_browse_tm.clicked.connect(self._browse_tm)
         tm_btn_layout.addWidget(btn_browse_tm)
 
+        btn_create_tm = QPushButton("➕ Criar Nova TM (.sdltm)...")
+        btn_create_tm.setStyleSheet("""
+            QPushButton {
+                background-color: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6;
+                border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2563eb; color: white; }
+        """)
+        btn_create_tm.clicked.connect(self._create_new_tm)
+        tm_btn_layout.addWidget(btn_create_tm)
+
         btn_clear_tm = QPushButton("Remover Selecionada")
         btn_clear_tm.setStyleSheet("""
             QPushButton {
@@ -317,6 +328,16 @@ class QuickStartDialog(QDialog):
             if combo.itemData(i) == code or code.lower() in combo.itemData(i).lower():
                 combo.setCurrentIndex(i)
                 return
+
+    def _create_new_tm(self):
+        from ui.create_sdltm_dialog import CreateSdltmDialog
+        dlg = CreateSdltmDialog(
+            default_src=self.source_lang,
+            default_tgt=self.target_lang,
+            parent=self
+        )
+        if dlg.exec() and dlg.created_path:
+            self._add_tm_path(dlg.created_path)
 
     def _browse_tm(self):
         file_path, _ = QFileDialog.getOpenFileName(

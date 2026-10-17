@@ -136,57 +136,60 @@ def iter_sdlxliff(path: str) -> Iterator[Segment]:
     Gera Segment por cada <mrk mtype='seg'> (verdadeira unidade de traducao).
     Um trans-unit pode gerar varios segmentos.
     """
-    ctx = ET.iterparse(path, events=("end",), tag=("{%s}trans-unit" % XLIFF,))
-    order = 0
-    for _, tu in ctx:
-        tu_id = tu.get("id") or ""
-        meta = _seg_defs_meta(tu)
+    with open(path, "rb") as f:
+        ctx = ET.iterparse(f, events=("end",), tag=("{%s}trans-unit" % XLIFF,))
+        order = 0
+        for _, tu in ctx:
+            tu_id = tu.get("id") or ""
+            meta = _seg_defs_meta(tu)
 
-        seg_source = tu.find("x:seg-source", N)
-        target = tu.find("x:target", N)
+            seg_source = tu.find("x:seg-source", N)
+            target = tu.find("x:target", N)
 
-        # indexar targets por mid para emparelhar
-        tgt_by_mid = {}
-        if target is not None:
-            for mrk in _iter_seg_mrks(target):
-                tgt_by_mid[mrk.get("mid") or ""] = mrk
+            # indexar targets por mid para emparelhar
+            tgt_by_mid = {}
+            if target is not None:
+                for mrk in _iter_seg_mrks(target):
+                    tgt_by_mid[mrk.get("mid") or ""] = mrk
 
-        src_mrks = list(_iter_seg_mrks(seg_source)) if seg_source is not None else []
-        if src_mrks:
-                src_txt, src_tags = _mrk_text_with_tags(mrk)
-                if not display_text(src_txt).strip():
-                    continue
-                tgt_mrk = tgt_by_mid.get(mid)
-                tgt_txt, tgt_tags = _mrk_text_with_tags(tgt_mrk) if tgt_mrk is not None else ("", [])
-                if mid in meta:
-                    state, origin, percent = meta[mid]
-                else:
-                    state = SegState.TRANSLATED if tgt_txt.strip() else SegState.UNTRANSLATED
-                    origin = SegOrigin.NONE
-                    percent = 0
-                yield Segment(
-                    source=src_txt, target=tgt_txt, tu_id=tu_id, seg_id=mid,
-                    state=state, origin=origin, percent=percent,
-                    source_tags=src_tags, target_tags=tgt_tags, order=order,
-                )
-                order += 1
-        else:
-            # sem seg-source: usar source/target simples (XLIFF puro)
-            # Ignora nós estruturais do Trados que contêm apenas tags/placeholders ou translate="no"
-            if tu.get("translate") != "no":
-                src_txt, src_tags = _plain(tu.find("x:source", N))
-                if display_text(src_txt).strip():
-                    tgt_txt, tgt_tags = _plain(tu.find("x:target", N))
-                    state = SegState.TRANSLATED if tgt_txt.strip() else SegState.UNTRANSLATED
+            src_mrks = list(_iter_seg_mrks(seg_source)) if seg_source is not None else []
+            if src_mrks:
+                for mrk in src_mrks:
+                    mid = mrk.get("mid") or ""
+                    src_txt, src_tags = _mrk_text_with_tags(mrk)
+                    if not display_text(src_txt).strip():
+                        continue
+                    tgt_mrk = tgt_by_mid.get(mid)
+                    tgt_txt, tgt_tags = _mrk_text_with_tags(tgt_mrk) if tgt_mrk is not None else ("", [])
+                    if mid in meta:
+                        state, origin, percent = meta[mid]
+                    else:
+                        state = SegState.TRANSLATED if tgt_txt.strip() else SegState.UNTRANSLATED
+                        origin = SegOrigin.NONE
+                        percent = 0
                     yield Segment(
-                        source=src_txt, target=tgt_txt, tu_id=tu_id, seg_id="",
-                        state=state, source_tags=src_tags, target_tags=tgt_tags, order=order,
+                        source=src_txt, target=tgt_txt, tu_id=tu_id, seg_id=mid,
+                        state=state, origin=origin, percent=percent,
+                        source_tags=src_tags, target_tags=tgt_tags, order=order,
                     )
                     order += 1
+            else:
+                # sem seg-source: usar source/target simples (XLIFF puro)
+                # Ignora nós estruturais do Trados que contêm apenas tags/placeholders ou translate="no"
+                if tu.get("translate") != "no":
+                    src_txt, src_tags = _plain(tu.find("x:source", N))
+                    if display_text(src_txt).strip():
+                        tgt_txt, tgt_tags = _plain(tu.find("x:target", N))
+                        state = SegState.TRANSLATED if tgt_txt.strip() else SegState.UNTRANSLATED
+                        yield Segment(
+                            source=src_txt, target=tgt_txt, tu_id=tu_id, seg_id="",
+                            state=state, source_tags=src_tags, target_tags=tgt_tags, order=order,
+                        )
+                        order += 1
 
-        tu.clear()
-        while tu.getprevious() is not None:
-            del tu.getparent()[0]
+            tu.clear()
+            while tu.getprevious() is not None:
+                del tu.getparent()[0]
 
 
 def _plain(el) -> tuple[str, list[InlineTag]]:

@@ -116,6 +116,11 @@ class TmManagementUtilityDialog(QDialog):
         btn_browse.clicked.connect(self._browse_tm)
         file_layout.addWidget(btn_browse)
 
+        btn_new_tm = QPushButton("➕ Nova TM (.sdltm)...")
+        btn_new_tm.setStyleSheet("background-color: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6; font-weight: bold;")
+        btn_new_tm.clicked.connect(self._create_new_tm)
+        file_layout.addWidget(btn_new_tm)
+
         layout.addWidget(file_box)
 
         # ---------------- Painel de Estatísticas
@@ -203,6 +208,16 @@ class TmManagementUtilityDialog(QDialog):
 
     def _log(self, message: str) -> None:
         self.log_edit.append(message)
+
+    def _create_new_tm(self) -> None:
+        from ui.create_sdltm_dialog import CreateSdltmDialog
+        dlg = CreateSdltmDialog(parent=self)
+        if dlg.exec() and dlg.created_path:
+            self.active_db_path = dlg.created_path
+            self.path_edit.setText(dlg.created_path)
+            self.tm = TranslationMemory(dlg.created_path)
+            self._refresh_tm_info()
+            self.tm_updated.emit()
 
     def _browse_tm(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

@@ -233,6 +233,7 @@ class MainContainer(QMainWindow):
         self.welcome_screen.file_selected.connect(self._handle_universal_file_import)
         self.welcome_screen.open_project_requested.connect(self.projects_screen._open_project_dialog)
         self.welcome_screen.open_tm_requested.connect(lambda: self._navigate_to("tm"))
+        self.welcome_screen.create_tm_requested.connect(self._create_new_sdltm_dialog)
 
         self.projects_screen.project_opened.connect(self._on_project_opened)
         self.projects_screen.file_opened.connect(self._open_specific_file)
@@ -245,6 +246,7 @@ class MainContainer(QMainWindow):
         r.open_project_requested.connect(self.projects_screen._open_project_dialog)
         r.open_file_requested.connect(self._open_file_dialog)
         r.save_file_requested.connect(self.editor_screen.save_current)
+        r.create_sdltm_requested.connect(self._create_new_sdltm_dialog)
         r.xbench_qa_requested.connect(self._show_xbench_qa)
         r.verify_qa_requested.connect(self._show_xbench_qa)
         r.display_filter_changed.connect(self._on_display_filter_changed)
@@ -535,6 +537,31 @@ class MainContainer(QMainWindow):
         self._navigate_to("editor")
         self.editor_screen._select_row(row_index)
         self.editor_screen.tgt_edit.setFocus()
+
+    def _create_new_sdltm_dialog(self) -> None:
+        """Abre o diálogo de criação de uma nova memória de tradução RWS Trados (.sdltm)."""
+        from ui.create_sdltm_dialog import CreateSdltmDialog
+        src_lang = "en-US"
+        tgt_lang = "pt-BR"
+        if self._current_project:
+            src_lang = self._current_project.source_lang or src_lang
+            tgt_lang = self._current_project.target_lang or tgt_lang
+        elif self.editor_screen and self.editor_screen.config:
+            src_lang = self.editor_screen.config.source_lang or src_lang
+            tgt_lang = self.editor_screen.config.target_lang or tgt_lang
+
+        dlg = CreateSdltmDialog(default_src=src_lang, default_tgt=tgt_lang, parent=self)
+        if dlg.exec() and dlg.created_path:
+            created_path = dlg.created_path
+            # Se o editor estiver com arquivo carregado, associa à sessão atual
+            if self.editor_screen.file_path:
+                self.editor_screen.attach_tm(created_path)
+                self._navigate_to("editor")
+                self.status_bar.showMessage(f"Nova memória .sdltm criada e associada: {os.path.basename(created_path)}")
+            else:
+                self.tm_screen.load_tm_file(created_path)
+                self._navigate_to("tm")
+                self.status_bar.showMessage(f"Nova memória .sdltm criada com sucesso: {os.path.basename(created_path)}")
 
     def _show_tm_utility(self) -> None:
         """Abre o Utilitário Trados Translation Memory Management."""

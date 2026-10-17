@@ -123,6 +123,7 @@ class WelcomeScreen(QWidget):
     file_selected = Signal(str)
     open_project_requested = Signal()
     open_tm_requested = Signal()
+    create_tm_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -154,6 +155,17 @@ class WelcomeScreen(QWidget):
         header_layout.addStretch()
 
         # Botões de Ação Rápida no Topo
+        btn_create_tm = QPushButton("➕ Criar Memória (.sdltm)")
+        btn_create_tm.setStyleSheet("""
+            QPushButton {
+                background-color: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6;
+                border-radius: 4px; padding: 7px 14px; font-size: 11px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2563eb; color: white; }
+        """)
+        btn_create_tm.clicked.connect(self.create_tm_requested.emit)
+        header_layout.addWidget(btn_create_tm)
+
         btn_proj = QPushButton("📦 Abrir Projeto (.sdlproj)")
         btn_proj.setStyleSheet("""
             QPushButton {
