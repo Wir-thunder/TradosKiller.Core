@@ -77,11 +77,12 @@ class EmbeddedSLMEngine:
         if os.path.exists(project_models):
             dirs_to_check.append(project_models)
 
-        # 2. Pasta %USERPROFILE%/.tradoskiller/models
+        # 2. Pasta do utilizador (.cat_workspace / .cat_tool / legada)
         user_home = os.path.expanduser("~")
-        tk_user_models = os.path.join(user_home, ".tradoskiller", "models")
-        if os.path.exists(tk_user_models):
-            dirs_to_check.append(tk_user_models)
+        for u_dir in (".cat_workspace", ".cat_tool", ".tradoskiller"):
+            u_models = os.path.join(user_home, u_dir, "models")
+            if os.path.exists(u_models):
+                dirs_to_check.append(u_models)
 
         # 3. Disco D: (caso exista pasta D:\models ou D:\)
         for d_cand in (r"D:\models", r"D:\SLM", r"D:\LLM"):

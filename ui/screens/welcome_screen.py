@@ -53,7 +53,7 @@ class UniversalDropZone(QFrame):
 
         sub = QLabel(
             "Word (.docx), Excel (.xlsx), PowerPoint (.pptx), PDF, Imagens (com OCR),\n"
-            "Texto (.txt, .md, .html, .xml, .json) ou arquivos Trados (.sdlxliff, .sdltm, .tmx)"
+            "Texto (.txt, .md, .html, .xml, .json) ou arquivos bilingues (.sdlxliff, .sdltm, .tmx)"
         )
         sub.setAlignment(Qt.AlignCenter)
         sub.setStyleSheet("color: #9cdcfe; font-size: 12px; line-height: 1.5; border: none; background: transparent;")
@@ -142,7 +142,7 @@ class WelcomeScreen(QWidget):
         logo_title_v = QVBoxLayout()
         logo_title_v.setSpacing(2)
 
-        title = QLabel("TradosKiller — CAT Workspace de Alta Performance")
+        title = QLabel("CAT Workspace — Plataforma de Alta Performance")
         title.setFont(QFont("Segoe UI", 18, QFont.Bold))
         title.setStyleSheet("color: #8eb4f3;")
         logo_title_v.addWidget(title)
@@ -206,7 +206,7 @@ class WelcomeScreen(QWidget):
         badges_info = [
             ("📝 Documentos", "Word (.docx), Excel (.xlsx), PowerPoint (.pptx)"),
             ("📑 PDF & OCR", "PDFs nativos e digitalizados, Imagens (.png, .jpg)"),
-            ("🗂 Trados & CAT", ".sdlxliff, .sdltm, .tmx, .sdlproj, .sdlppx"),
+            ("🗂 Formatos CAT", ".sdlxliff, .sdltm, .tmx, .sdlproj, .sdlppx"),
             ("🌐 Web & Texto", ".txt, .html, .xml, .json, .csv, .md, .po"),
         ]
 
@@ -255,12 +255,12 @@ class WelcomeScreen(QWidget):
             main_layout.addWidget(self.list_recents, stretch=1)
 
     def _browse_file(self):
-        """Abre o diálogo de seleção de arquivo suportando todos os formatos do Trados + OCR."""
+        """Abre o diálogo de seleção de arquivo suportando todos os formatos bilingues + OCR."""
         filter_str = (
             "Todos os Formatos Suportados (*.docx *.xlsx *.pptx *.pdf *.png *.jpg *.jpeg *.tiff *.bmp *.txt *.html *.xml *.json *.csv *.sdlxliff *.tmx *.sdltm *.sdlproj *.sdlppx);;"
             "Documentos Office (*.docx *.xlsx *.pptx);;"
             "PDF e Imagens OCR (*.pdf *.png *.jpg *.jpeg *.tiff *.bmp);;"
-            "Arquivos Trados e CAT (*.sdlxliff *.sdltm *.tmx *.sdlproj *.sdlppx);;"
+            "Arquivos Bilingues e CAT (*.sdlxliff *.sdltm *.tmx *.sdlproj *.sdlppx);;"
             "Arquivos de Texto e Web (*.txt *.html *.xml *.json *.csv *.md);;"
             "Todos os Arquivos (*.*)"
         )

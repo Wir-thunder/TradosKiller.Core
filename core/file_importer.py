@@ -57,9 +57,9 @@ def get_file_type_badge(path: str) -> Tuple[str, str]:
     """Retorna (categoria, ícone) do arquivo."""
     ext = os.path.splitext(path)[1].lower()
     if ext in BILINGUAL_EXTS:
-        return "Bilingue Trados", "🗂"
+        return "Ficheiro Bilingue", "🗂"
     if ext in PROJECT_EXTS:
-        return "Projeto / Pacote Trados", "📦"
+        return "Projeto / Pacote CAT", "📦"
     if ext in {".docx", ".doc"}:
         return "Documento Word", "📝"
     if ext in {".xlsx", ".xls"}:
@@ -367,7 +367,7 @@ def convert_to_sdlxliff(
     base_name = os.path.basename(source_path)
     out_dir = output_dir or os.path.dirname(source_path)
     if not out_dir or not os.path.exists(out_dir):
-        out_dir = os.path.join(os.environ.get("USERPROFILE", "."), "Documents", "TradosKiller_Projects")
+        out_dir = os.path.join(os.environ.get("USERPROFILE", "."), "Documents", "CAT_Projects")
         os.makedirs(out_dir, exist_ok=True)
 
     out_sdlxliff = os.path.join(out_dir, f"{base_name}.sdlxliff")

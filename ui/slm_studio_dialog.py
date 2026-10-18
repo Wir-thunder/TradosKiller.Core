@@ -243,8 +243,8 @@ class SLMStudioDialog(QDialog):
 
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("Nome do Modelo:"))
-        self.txt_model_name = QLineEdit("trados-automotive-slm:latest")
-        self.txt_model_name.setToolTip("Nome único para o modelo no Ollama (ex: trados-slm:latest)")
+        self.txt_model_name = QLineEdit("custom-domain-slm:latest")
+        self.txt_model_name.setToolTip("Nome único para o modelo no Ollama (ex: domain-slm:latest)")
         row1.addWidget(self.txt_model_name, stretch=2)
 
         row1.addWidget(QLabel("Modelo Base Ollama:"))
@@ -464,7 +464,7 @@ class SLMStudioDialog(QDialog):
         for idx, m in enumerate(models):
             self.combo_base_model.addItem(m)
             self.combo_active_model.addItem(m)
-            if m == default_model or "trados-slm" in m or "toyotao" in m:
+            if m == default_model or "custom-domain-slm" in m or "trados-slm" in m or "toyotao" in m:
                 target_idx = idx
 
         if models:
@@ -494,7 +494,7 @@ class SLMStudioDialog(QDialog):
                     self,
                     "Modelo Embedded Carregado",
                     f"Modelo GGUF carregado diretamente em memória com sucesso:\n{os.path.basename(file_path)}\n\n"
-                    "O TradosKiller está agora utilizando este modelo in-process sem necessidade de Ollama externo."
+                    "O sistema está agora utilizando este modelo in-process sem necessidade de Ollama externo."
                 )
 
     def _scan_d_drive_sdltms(self) -> None:
@@ -530,9 +530,9 @@ class SLMStudioDialog(QDialog):
         """Abre diálogo para seleção manual de bases .sdltm."""
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "Selecionar Memórias SDL Trados (.sdltm)",
+            "Selecionar Memórias de Tradução (.sdltm)",
             "D:\\",
-            "SDL Translation Memories (*.sdltm)"
+            "Translation Memories (*.sdltm)"
         )
         if not files:
             return

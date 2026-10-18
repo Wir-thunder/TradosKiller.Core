@@ -119,7 +119,7 @@ class GenerateFilteredDialog(QDialog):
         bv.setContentsMargins(8, 6, 8, 6)
         bv.setSpacing(4)
 
-        title_lbl = QLabel("📑 Generate Filtered File — Trados Studio ADF 2.0")
+        title_lbl = QLabel("📑 Gerar Ficheiro Filtrado — Advanced Display Filter 2.0")
         title_lbl.setStyleSheet("font-size: 13px; font-weight: bold; color: #8eb4f3;")
         bv.addWidget(title_lbl)
 
@@ -143,7 +143,7 @@ class GenerateFilteredDialog(QDialog):
 
         self.btn_group = QButtonGroup(self)
 
-        self.rb_sdlxliff = QRadioButton("📄 SDL Trados Studio Bilingual File (*.sdlxliff)")
+        self.rb_sdlxliff = QRadioButton("📄 Ficheiro Bilíngue SDLXLIFF (*.sdlxliff)")
         self.rb_sdlxliff.setToolTip("Exporta um ficheiro bilíngue SDLXLIFF com os segmentos filtrados prontos para tradução")
         self.rb_sdlxliff.setChecked(True)
         self.btn_group.addButton(self.rb_sdlxliff, 0)
@@ -159,7 +159,7 @@ class GenerateFilteredDialog(QDialog):
         self.btn_group.addButton(self.rb_tmx, 2)
         fv.addWidget(self.rb_tmx)
 
-        self.rb_sdltm = QRadioButton("💾 Memória RWS Trados Studio SDLTM (*.sdltm)")
+        self.rb_sdltm = QRadioButton("💾 Memória de Tradução SDLTM (*.sdltm)")
         self.rb_sdltm.setToolTip("Exporta diretamente para uma nova base de dados de memória SDLTM")
         self.btn_group.addButton(self.rb_sdltm, 3)
         fv.addWidget(self.rb_sdltm)
@@ -240,13 +240,13 @@ class GenerateFilteredDialog(QDialog):
     def _browse_path(self) -> None:
         fmt_id = self.btn_group.checkedId()
         if fmt_id == 0:
-            filter_str = "Trados SDLXLIFF (*.sdlxliff)"
+            filter_str = "Ficheiro SDLXLIFF (*.sdlxliff)"
         elif fmt_id == 1:
             filter_str = "Tabela CSV Excel (*.csv)"
         elif fmt_id == 2:
             filter_str = "Memória TMX (*.tmx)"
         else:
-            filter_str = "Trados SDLTM (*.sdltm)"
+            filter_str = "Memória SDLTM (*.sdltm)"
 
         path, _ = QFileDialog.getSaveFileName(
             self, "Salvar Ficheiro Filtrado Como", self.txt_path.text(), filter_str

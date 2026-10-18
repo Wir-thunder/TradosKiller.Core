@@ -39,7 +39,7 @@ class TmManagementUtilityDialog(QDialog):
 
     def __init__(self, current_tm: Optional[TranslationMemory] = None, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Trados Translation Memory Management Utility")
+        self.setWindowTitle("Translation Memory Management Utility")
         self.resize(850, 620)
         self.tm = current_tm
         self.active_db_path = current_tm.db_path if current_tm else ""
@@ -222,7 +222,7 @@ class TmManagementUtilityDialog(QDialog):
     def _browse_tm(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Abrir Memória de Tradução", "",
-            "Memórias RWS Trados & TMX (*.sdltm *.tmx *.db);;Trados TM (*.sdltm);;TMX (*.tmx);;Todos (*.*)"
+            "Memórias de Tradução (*.sdltm *.tmx *.db);;Memória SDLTM (*.sdltm);;TMX Standard (*.tmx);;Todos (*.*)"
         )
         if not path:
             return

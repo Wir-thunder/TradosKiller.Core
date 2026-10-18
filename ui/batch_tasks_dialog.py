@@ -37,7 +37,7 @@ class BatchTasksDialog(QDialog):
         self.tm = current_tm
         self.current_report: Optional[BatchAnalysisReport] = None
 
-        self.setWindowTitle("Tarefas em Lote — SDL Trados Studio Batch Tasks")
+        self.setWindowTitle("Tarefas em Lote — Batch Tasks Wizard")
         self.resize(850, 560)
         self._apply_dark_theme()
         self._build_ui()
@@ -297,7 +297,7 @@ class BatchTasksDialog(QDialog):
             "Aplica automaticamente correspondências exatas da TM aos segmentos pendentes.",
             "Executa todas as verificações de controle de qualidade (QA ApSIC Xbench) em todos os ficheiros.",
             "Envia todas as traduções confirmadas e aprovadas para a memória de tradução principal (.sdltm).",
-            "Detecta e recombina automaticamente segmentos quebrados por abreviações, decimais ou regras legadas do Trados."
+            "Detecta e recombina automaticamente segmentos quebrados indevidamente por abreviações, decimais ou pontuação."
         ]
         self.task_desc_lbl.setText(descriptions[index] if index < len(descriptions) else "")
         self.options_frame.setVisible(index == 1) # apenas pretranslate tem opções específicas
@@ -449,7 +449,7 @@ class BatchTasksDialog(QDialog):
 
     def _run_update_tm(self, files: List[str]) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "Selecionar Memória SDLTM Principal", "", "Trados SDLTM (*.sdltm)"
+            self, "Selecionar Memória SDLTM Principal", "", "Memória de Tradução (*.sdltm)"
         )
         if not path:
             return
@@ -466,7 +466,7 @@ class BatchTasksDialog(QDialog):
             f"=== EXECUÇÃO: UPDATE MAIN TRANSLATION MEMORIES ===\n"
             f"Memória de destino: {path}\n"
             f"Segmentos confirmados gravados: {count:,}\n"
-            f"Base de memória nativa SDL Trados Studio atualizada com sucesso!"
+            f"Base de memória nativa (.sdltm) atualizada com sucesso!"
         )
 
     def _run_heal(self, files: List[str]) -> None:

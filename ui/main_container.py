@@ -1,10 +1,10 @@
 """
-ui.main_container - Janela Principal da CAT Tool com Ribbon Bar e Sidebar estilo SDL Trados Studio.
+ui.main_container - Janela Principal da CAT Tool com Ribbon Bar e Sidebar estilo CAT Studio.
 
-Layout Profissional RWS Trados:
+Layout Profissional CAT:
 - Ribbon Bar no topo com abas: Início, Revisão, Memórias, Projeto & Ficheiros
 - Sidebar lateral de navegação rápida: Welcome, Projects, Files, Reports, Editor, TMs
-- Suporte nativo completo a ficheiros RWS (.sdlxliff, .sdltm, .sdlproj, .sdlppx, .sdlrpx) e TMX
+- Suporte nativo completo a ficheiros de tradução (.sdlxliff, .sdltm, .sdlproj, .sdlppx, .sdlrpx) e TMX
 - Barra de Localizar e Substituir (Ctrl+F / Ctrl+H) e Review Bar com badges de status
 """
 from __future__ import annotations
@@ -87,11 +87,11 @@ class NavigationButton(QPushButton):
 
 
 class MainContainer(QMainWindow):
-    """Janela principal com Ribbon Bar estilo Trados e sidebar lateral."""
+    """Janela principal com Ribbon Bar moderna e sidebar lateral."""
     
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("CAT Tool — Professional RWS Trados Translation Workspace")
+        self.setWindowTitle("CAT Workspace — Professional Translation Environment")
         self.resize(1440, 920)
         self.setMinimumSize(900, 600)
         self.setAcceptDrops(True)
@@ -103,7 +103,7 @@ class MainContainer(QMainWindow):
         self._connect_signals()
 
     def _apply_dark_theme(self) -> None:
-        """Aplica tema escuro profissional estilo Trados Studio."""
+        """Aplica tema escuro profissional."""
         app = QApplication.instance()
         palette = QPalette()
         
@@ -150,7 +150,7 @@ class MainContainer(QMainWindow):
         sidebar_layout.setContentsMargins(6, 8, 6, 8)
         sidebar_layout.setSpacing(3)
 
-        title = QLabel("TRADOS WORKSPACE")
+        title = QLabel("CAT WORKSPACE")
         title.setStyleSheet("font-size: 11px; font-weight: bold; color: #007acc; padding: 6px;")
         sidebar_layout.addWidget(title)
 
@@ -193,7 +193,7 @@ class MainContainer(QMainWindow):
         self.status_bar = QStatusBar()
         self.status_bar.setStyleSheet("background-color: #007acc; color: white; font-size: 10px; font-weight: bold;")
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("TradosKiller pronto — Arraste qualquer ficheiro para traduzir.")
+        self.status_bar.showMessage("Workspace pronto — Arraste qualquer ficheiro para traduzir.")
 
         self._navigate_to("welcome")
 
@@ -358,7 +358,7 @@ class MainContainer(QMainWindow):
             "Todos os Formatos Suportados (*.docx *.xlsx *.pptx *.pdf *.png *.jpg *.jpeg *.tiff *.bmp *.txt *.html *.xml *.json *.csv *.sdlxliff *.tmx *.sdltm *.sdlproj *.sdlppx);;"
             "Documentos Office (*.docx *.xlsx *.pptx);;"
             "PDF e Imagens OCR (*.pdf *.png *.jpg *.jpeg *.tiff *.bmp);;"
-            "Ficheiros RWS & CAT (*.sdlxliff *.sdltm *.sdlproj *.sdlppx *.sdlrpx *.tmx *.catproj *.xlf *.xliff);;"
+            "Ficheiros de Tradução & CAT (*.sdlxliff *.sdltm *.sdlproj *.sdlppx *.sdlrpx *.tmx *.catproj *.xlf *.xliff);;"
             "Todos os Ficheiros (*.*)"
         )
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Ficheiro para Traduzir", "", filter_str)
@@ -464,8 +464,8 @@ class MainContainer(QMainWindow):
 
     def _open_sdlproj_dialog(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Abrir Projeto SDL Trados", "",
-            "Projetos SDL (*.sdlproj);;Todos os Ficheiros (*.*)"
+            self, "Abrir Projeto de Tradução (.sdlproj)", "",
+            "Projetos de Tradução (*.sdlproj);;Todos os Ficheiros (*.*)"
         )
         if path:
             self._load_sdlproj(path)
@@ -473,15 +473,15 @@ class MainContainer(QMainWindow):
     def _load_sdlproj(self, path: str) -> None:
         project = parse_sdlproj(path)
         if not project or not project.files:
-            QMessageBox.warning(self, "Projeto SDL", "Não foi possível extrair ficheiros do projeto SDL.")
+            QMessageBox.warning(self, "Projeto", "Não foi possível extrair ficheiros do projeto.")
             return
         self._on_project_opened(project)
-        self.status_bar.showMessage(f"Projeto SDL carregado: {project.name} ({len(project.files)} ficheiro(s))")
+        self.status_bar.showMessage(f"Projeto carregado: {project.name} ({len(project.files)} ficheiro(s))")
 
     def _open_sdlpackage_dialog(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Abrir Pacote de Projeto SDL (.sdlppx)", "",
-            "Pacotes SDL Trados (*.sdlppx *.sdlrpx);;Todos os Ficheiros (*.*)"
+            self, "Abrir Pacote de Projeto (.sdlppx)", "",
+            "Pacotes de Projeto (*.sdlppx *.sdlrpx);;Todos os Ficheiros (*.*)"
         )
         if path:
             self._load_sdlpackage(path)
@@ -539,7 +539,7 @@ class MainContainer(QMainWindow):
         self.editor_screen.tgt_edit.setFocus()
 
     def _create_new_sdltm_dialog(self) -> None:
-        """Abre o diálogo de criação de uma nova memória de tradução RWS Trados (.sdltm)."""
+        """Abre o diálogo de criação de uma nova memória de tradução (.sdltm)."""
         from ui.create_sdltm_dialog import CreateSdltmDialog
         src_lang = "en-US"
         tgt_lang = "pt-BR"
@@ -564,7 +564,7 @@ class MainContainer(QMainWindow):
                 self.status_bar.showMessage(f"Nova memória .sdltm criada com sucesso: {os.path.basename(created_path)}")
 
     def _show_tm_utility(self) -> None:
-        """Abre o Utilitário Trados Translation Memory Management."""
+        """Abre o Utilitário de Gestão de Memórias de Tradução."""
         dialog = TmManagementUtilityDialog(current_tm=self.editor_screen.tm, parent=self)
         dialog.tm_updated.connect(self._on_tm_utility_updated)
         dialog.exec()

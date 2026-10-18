@@ -120,7 +120,7 @@ class QuickStartDialog(QDialog):
         parent=None
     ):
         super().__init__(parent)
-        self.setWindowTitle("Configuração Rápida de Tradução — TradosKiller")
+        self.setWindowTitle("Configuração Rápida de Tradução — CAT Workspace")
         self.resize(620, 520)
         self.setModal(True)
 
@@ -344,7 +344,7 @@ class QuickStartDialog(QDialog):
             self,
             "Selecionar Memória de Tradução",
             "",
-            "Memórias de Tradução (*.sdltm *.tmx *.db);;Trados SDLTM (*.sdltm);;TMX Standard (*.tmx);;Todos os Ficheiros (*.*)"
+            "Memórias de Tradução (*.sdltm *.tmx *.db);;Memória SDLTM (*.sdltm);;TMX Standard (*.tmx);;Todos os Ficheiros (*.*)"
         )
         if file_path:
             self._add_tm_path(file_path)

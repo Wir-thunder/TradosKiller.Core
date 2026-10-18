@@ -143,7 +143,7 @@ class BatchAnalysisReport:
 </style>
 </head>
 <body>
-<h1>Relatório de Análise de Ficheiros (Trados Studio Analysis)</h1>
+<h1>Relatório de Análise de Ficheiros (CAT Analysis Report)</h1>
 <div class="meta">
     <strong>Projeto:</strong> {self.project_name} | 
     <strong>Data:</strong> {self.created_at} | 

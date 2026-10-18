@@ -1,11 +1,11 @@
 """
-ui.ribbon - Ribbon Bar dinâmico e contextual estilo SDL Trados Studio 2021 / 2024.
+ui.ribbon - Ribbon Bar dinâmico e contextual estilo CAT Studio Moderno.
 
 O Ribbon adapta-se dinamicamente conforme a visão ativa:
-- Visão Projetos: Ações de projeto, pacotes RWS (.sdlppx / .sdlrpx), gestão de ficheiros e QA Xbench
+- Visão Projetos: Ações de projeto, pacotes de projeto (.sdlppx / .sdlrpx), gestão de ficheiros e QA Xbench
 - Visão Ficheiros: Ações de ficheiro, abrir para tradução, tarefas em lote
 - Visão Editor: Ações de tradução (Confirm & Next), navegação, localizar/substituir, revisão, ApSIC Xbench QA
-- Visão Memórias (TM): Trados Translation Memory Management Utility (Vacuum, Deduplicação, FTS, Integridade)
+- Visão Memórias (TM): Utilitário de Gestão de Memórias de Tradução (Vacuum, Deduplicação, FTS, Integridade)
 """
 from __future__ import annotations
 
@@ -298,7 +298,7 @@ class RibbonBar(QWidget):
         self.stack.setCurrentIndex(0)
 
     def _create_batch_tasks_button(self) -> RibbonButton:
-        btn_batch = RibbonButton("⚙", "Batch\nTasks ▾", "Tarefas em Lote do Trados Studio (Análise, Pré-tradução, QA, TMs)")
+        btn_batch = RibbonButton("⚙", "Batch\nTasks ▾", "Tarefas em Lote (Análise, Pré-tradução, QA, TMs)")
         btn_batch.setStyleSheet("""
             QPushButton {
                 background-color: #252526;
@@ -367,14 +367,14 @@ class RibbonBar(QWidget):
         btn_new_proj.clicked.connect(self.new_project_requested.emit)
         grp_proj.add_widget(btn_new_proj)
 
-        btn_open_proj = RibbonButton("📁", "Abrir\nProjeto", "Abrir projeto CAT ou SDL Trados (.sdlproj)")
+        btn_open_proj = RibbonButton("📁", "Abrir\nProjeto", "Abrir projeto de tradução (.sdlproj ou .catproj)")
         btn_open_proj.clicked.connect(self.open_project_requested.emit)
         grp_proj.add_widget(btn_open_proj)
         lh.addWidget(grp_proj)
 
-        # Grupo: Pacotes Trados RWS
-        grp_pkg = RibbonGroup("Pacotes Trados RWS")
-        btn_pkg = RibbonButton("📦", "Abrir Pacote\n(.sdlppx)", "Descompactar pacote de projeto Trados")
+        # Grupo: Pacotes de Projeto
+        grp_pkg = RibbonGroup("Pacotes de Projeto")
+        btn_pkg = RibbonButton("📦", "Abrir Pacote\n(.sdlppx)", "Descompactar pacote de projeto (.sdlppx)")
         btn_pkg.clicked.connect(self.open_sdlpackage_requested.emit)
         grp_pkg.add_widget(btn_pkg)
 
@@ -431,7 +431,7 @@ class RibbonBar(QWidget):
         btn_xbench.clicked.connect(self.xbench_qa_requested.emit)
         grp_qa.add_widget(btn_xbench)
 
-        btn_tm_util = RibbonButton("🛠", "Utilitário TM\nManagement", "Abrir o Trados Translation Memory Management Utility")
+        btn_tm_util = RibbonButton("🛠", "Utilitário TM\nManagement", "Abrir o Utilitário de Gestão de Memórias de Tradução")
         btn_tm_util.clicked.connect(self.tm_utility_requested.emit)
         grp_qa.add_widget(btn_tm_util)
 
@@ -455,7 +455,7 @@ class RibbonBar(QWidget):
 
         # Grupo: Memórias de Tradução
         grp_tm_proj = RibbonGroup("Memórias")
-        btn_create_tm_proj = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória SDL Trados Studio")
+        btn_create_tm_proj = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória de tradução (.sdltm)")
         btn_create_tm_proj.setStyleSheet("color: #93c5fd; font-weight: bold;")
         btn_create_tm_proj.clicked.connect(self.create_sdltm_requested.emit)
         grp_tm_proj.add_widget(btn_create_tm_proj)
@@ -665,9 +665,9 @@ class RibbonBar(QWidget):
         grp_tm.add_widget(btn_slm)
         lh.addWidget(grp_tm)
 
-        # Grupo: Filtro & QA Trados
+        # Grupo: Filtro & QA
         grp_filter = RibbonGroup("Filtro & QA")
-        btn_adf = RibbonButton("🔻", "Advanced Display\nFilter 2.0 (F6)", "Abrir o Advanced Display Filter 2.0 do Trados Studio (F6)")
+        btn_adf = RibbonButton("🔻", "Advanced Display\nFilter 2.0 (F6)", "Abrir o Advanced Display Filter 2.0 (F6)")
         btn_adf.setStyleSheet("""
             QPushButton {
                 background-color: #252526;
@@ -1002,7 +1002,7 @@ class RibbonBar(QWidget):
         lt.setContentsMargins(4, 2, 4, 2)
         lt.setSpacing(0)
 
-        grp_tm_maint = RibbonGroup("Trados TM Management Utility")
+        grp_tm_maint = RibbonGroup("TM Management Utility")
         btn_create_tm_v = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória SDLTM vazia")
         btn_create_tm_v.setStyleSheet("color: #93c5fd; font-weight: bold;")
         btn_create_tm_v.clicked.connect(self.create_sdltm_requested.emit)
@@ -1018,7 +1018,7 @@ class RibbonBar(QWidget):
         lt.addWidget(grp_tm_maint)
 
         grp_exp = RibbonGroup("Exportar")
-        btn_sdltm = RibbonButton("💾", "Exportar\n.sdltm", "Exportar como RWS SDLTM")
+        btn_sdltm = RibbonButton("💾", "Exportar\n.sdltm", "Exportar como base SDLTM")
         btn_sdltm.clicked.connect(self.export_sdltm_requested.emit)
         grp_exp.add_widget(btn_sdltm)
 
@@ -1061,21 +1061,21 @@ class RibbonBar(QWidget):
         lt.setSpacing(0)
 
         grp_tm_ops = RibbonGroup("Base de Dados SDLTM")
-        btn_new_sdltm = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar uma nova memória RWS Trados .sdltm vazia")
+        btn_new_sdltm = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar uma nova memória de tradução .sdltm vazia")
         btn_new_sdltm.setStyleSheet("color: #93c5fd; font-weight: bold;")
         btn_new_sdltm.clicked.connect(self.create_sdltm_requested.emit)
         grp_tm_ops.add_widget(btn_new_sdltm)
 
-        btn_open_sdltm = RibbonButton("📂", "Abrir .sdltm\n(Trados TM)", "Carregar memória nativa do RWS Trados")
+        btn_open_sdltm = RibbonButton("📂", "Abrir .sdltm\n(Memória TM)", "Carregar memória de tradução (.sdltm)")
         btn_open_sdltm.clicked.connect(self.open_file_requested.emit)
         grp_tm_ops.add_widget(btn_open_sdltm)
 
-        btn_exp_sdltm = RibbonButton("💾", "Exportar\n.sdltm", "Exportar como memória nativa do SDL Trados Studio")
+        btn_exp_sdltm = RibbonButton("💾", "Exportar\n.sdltm", "Exportar como base de dados .sdltm")
         btn_exp_sdltm.clicked.connect(self.export_sdltm_requested.emit)
         grp_tm_ops.add_widget(btn_exp_sdltm)
         lt.addWidget(grp_tm_ops)
 
-        grp_maint = RibbonGroup("Trados TM Management Utility")
+        grp_maint = RibbonGroup("Manutenção & Gestão de TMs")
         btn_util = RibbonButton("🛠", "Utilitário de\nManutenção", "Limpeza, Vacuum, Deduplicação e Integridade")
         btn_util.setStyleSheet("background-color: #007acc; color: white; font-weight: bold;")
         btn_util.clicked.connect(self.tm_utility_requested.emit)
@@ -1113,7 +1113,7 @@ class RibbonBar(QWidget):
         btn_new.clicked.connect(self.new_project_requested.emit)
         grp_start.add_widget(btn_new)
 
-        btn_new_tm = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória SDL Trados")
+        btn_new_tm = RibbonButton("➕💾", "Nova TM\n(.sdltm)", "Criar nova base de memória (.sdltm)")
         btn_new_tm.setStyleSheet("color: #93c5fd; font-weight: bold;")
         btn_new_tm.clicked.connect(self.create_sdltm_requested.emit)
         grp_start.add_widget(btn_new_tm)
@@ -1122,7 +1122,7 @@ class RibbonBar(QWidget):
         btn_open.clicked.connect(self.open_file_requested.emit)
         grp_start.add_widget(btn_open)
 
-        btn_proj = RibbonButton("📋", "Projeto SDL\n(.sdlproj)", "Abrir projeto completo do Trados")
+        btn_proj = RibbonButton("📋", "Projeto\n(.sdlproj)", "Abrir projeto de tradução (.sdlproj)")
         btn_proj.clicked.connect(self.open_sdlproj_requested.emit)
         grp_start.add_widget(btn_proj)
         lw.addWidget(grp_start)

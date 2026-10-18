@@ -712,7 +712,7 @@ class ProjectsScreen(QWidget):
         """Abre diálogo para selecionar arquivo de projeto do Trados (.sdlproj) ou .catproj."""
         path, _ = QFileDialog.getOpenFileName(
             self, "Abrir Projeto", "",
-            "Projetos Trados / CAT (*.sdlproj *.catproj);;Todos os Ficheiros (*.*)"
+            "Projetos de Tradução (*.sdlproj *.catproj);;Todos os Ficheiros (*.*)"
         )
         if path:
             proj = self._get_or_load_project(path)

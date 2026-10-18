@@ -578,7 +578,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(
                     self, "SDL Project",
                     "SDL project loaded but no translation files found.\n"
-                    "The project may need to be opened in Trados first."
+                    "The project file may need to be prepared or exported first."
                 )
         except Exception as e:  # noqa: BLE001
             QMessageBox.critical(self, "Error", f"Failed to open SDL project:\n{e}")

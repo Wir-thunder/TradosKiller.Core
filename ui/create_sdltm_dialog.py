@@ -36,7 +36,7 @@ class CreateSdltmDialog(QDialog):
         parent=None
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Criar Nova Memória de Tradução SDL Trados (.sdltm)")
+        self.setWindowTitle("Criar Nova Memória de Tradução (.sdltm)")
         self.resize(560, 380)
         self.created_path: Optional[str] = None
         self._default_src = default_src
@@ -101,12 +101,12 @@ class CreateSdltmDialog(QDialog):
         # Cabeçalho
         head_v = QVBoxLayout()
         head_v.setSpacing(3)
-        title = QLabel("➕ Nova Memória de Tradução RWS (.sdltm)")
+        title = QLabel("➕ Nova Memória de Tradução (.sdltm)")
         title.setFont(QFont("Segoe UI", 13, QFont.Bold))
         title.setStyleSheet("color: #8eb4f3;")
         head_v.addWidget(title)
 
-        subtitle = QLabel("Crie uma memória de tradução nativa compatível com todas as versões do Trados Studio.")
+        subtitle = QLabel("Crie uma memória de tradução nativa no formato padrão .sdltm.")
         subtitle.setStyleSheet("color: #888888; font-size: 11px;")
         head_v.addWidget(subtitle)
         layout.addLayout(head_v)
@@ -133,7 +133,7 @@ class CreateSdltmDialog(QDialog):
         lbl_name = QLabel("Nome Interno da Memória:")
         gv.addWidget(lbl_name)
         self.edit_name = QLineEdit()
-        self.edit_name.setPlaceholderText("Nome exibido no Trados Studio...")
+        self.edit_name.setPlaceholderText("Nome descritivo da memória...")
         gv.addWidget(self.edit_name)
 
         layout.addWidget(grp_file)
@@ -229,7 +229,7 @@ class CreateSdltmDialog(QDialog):
             self,
             "Salvar Nova Memória de Tradução (.sdltm)",
             default_file,
-            "Memória de Tradução SDL Trados (*.sdltm);;Todos os Ficheiros (*.*)"
+            "Memória de Tradução (*.sdltm);;Todos os Ficheiros (*.*)"
         )
         if path:
             if not path.lower().endswith(".sdltm"):
@@ -277,3 +277,4 @@ class CreateSdltmDialog(QDialog):
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Erro ao Criar Memória", f"Não foi possível criar o arquivo .sdltm:\n{e}")
+

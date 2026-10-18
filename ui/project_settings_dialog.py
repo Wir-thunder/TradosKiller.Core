@@ -285,7 +285,7 @@ class ProjectSettingsDialog(QDialog):
     def _add_existing_tm(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Selecionar Memória de Tradução", "",
-            "Memórias de Tradução (*.sdltm *.tmx);;Trados SDLTM (*.sdltm);;TMX (*.tmx)"
+            "Memórias de Tradução (*.sdltm *.tmx);;Memória SDLTM (*.sdltm);;TMX Standard (*.tmx)"
         )
         if not path:
             return
@@ -302,7 +302,7 @@ class ProjectSettingsDialog(QDialog):
     def _create_new_tm(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self, "Criar Nova Memória SDLTM", "New_Translation_Memory.sdltm",
-            "Trados SDLTM (*.sdltm)"
+            "Memória SDLTM (*.sdltm)"
         )
         if not path:
             return
