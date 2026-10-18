@@ -656,6 +656,20 @@ class TestTradosFull(unittest.TestCase):
         self.assertGreater(screen.table_prop_details.rowCount(), 5)
 
         # 5. Testa filtro por nome
+        if not screen._all_projects:
+            screen._all_projects.append({
+                "name": "Toyota_Test_Project",
+                "path": "C:/Projects/Toyota.sdlproj",
+                "status": "In Progress",
+                "due_date": "[none]",
+                "created_at": "18/10/2026 18:00:00",
+                "type": "Studio project",
+                "location": "C:/Projects",
+                "server": "(none)",
+                "organization": "n/a",
+                "created_by": "Local"
+            })
+            screen._apply_filters()
         screen.txt_filter_name.setText("NonExistentProjectNameXYZ")
         self.assertEqual(screen.table_projects.rowCount(), 0)
         screen.txt_filter_name.setText("")
@@ -1101,22 +1115,97 @@ class TestTradosFull(unittest.TestCase):
         self.assertTrue(has_embedded)
 
     def test_create_empty_sdltm_and_schema(self):
-        """Verifica a criação de nova memória .sdltm vazia e conformidade do schema SQLite."""
+        """Verifica a criação de nova memória .sdltm vazia e conformidade integral do schema SQLite de 22 tabelas."""
         import tempfile
-        from io_layer.sdltm import create_empty_sdltm, detect_sdltm_langs, iter_sdltm
+        import sqlite3
+        from io_layer.sdltm import create_empty_sdltm, detect_sdltm_langs, iter_sdltm, insert_or_update_sdltm_unit
         with tempfile.TemporaryDirectory() as tmp_dir:
             sdltm_path = os.path.join(tmp_dir, "TesteMemoria.sdltm")
             res_path = create_empty_sdltm(sdltm_path, src_lang="en-US", tgt_lang="pt-BR", name="TesteMemoria")
             self.assertTrue(os.path.exists(res_path))
-            
+
             # Verificar pares de idioma
             src, tgt = detect_sdltm_langs(res_path)
             self.assertEqual(src, "en-US")
             self.assertEqual(tgt, "pt-BR")
 
-            # Itera memória vazia sem erros
+            # Verifica se todas as tabelas relacionais exigidas pelo Trados Studio existem
+            conn = sqlite3.connect(res_path)
+            cur = conn.cursor()
+            tables = {r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            required_tables = {
+                "fuzzy_index1", "fuzzy_index2", "fuzzy_index4", "fuzzy_data",
+                "resources", "tm_resources", "translation_memories", "parameters",
+                "translation_units", "translation_unit_contexts", "attributes",
+                "string_attributes", "numeric_attributes", "date_attributes",
+                "picklist_values", "picklist_attributes", "vocab_src", "vocab_trg",
+                "vocabfilter", "trans_model", "trans_model_rev",
+                "translation_unit_fragments", "translation_unit_idcontexts"
+            }
+            self.assertTrue(required_tables.issubset(tables))
+
+            # Verifica expiration_date ('9999-12-31 23:59:59')
+            exp_date = cur.execute("SELECT expiration_date FROM translation_memories WHERE id=1").fetchone()[0]
+            self.assertEqual(exp_date, "9999-12-31 23:59:59")
+            conn.close()
+
+            # Insere uma unidade e verifica índices fuzzy e token BLOBs
+            ok = insert_or_update_sdltm_unit(res_path, "Road Safety Conference", "Conferência de Segurança Viária", "en-US", "pt-BR")
+            self.assertTrue(ok)
+
+            conn = sqlite3.connect(res_path)
+            cur = conn.cursor()
+            tu_row = cur.execute("SELECT source_token_data, target_token_data, tokenization_sig_hash FROM translation_units WHERE id=1").fetchone()
+            self.assertIsNotNone(tu_row[0])
+            self.assertIsNotNone(tu_row[1])
+            self.assertEqual(tu_row[2], 7319895137155145109)
+
+            fi1_cnt = cur.execute("SELECT count(*) FROM fuzzy_index1 WHERE translation_unit_id=1").fetchone()[0]
+            fi2_cnt = cur.execute("SELECT count(*) FROM fuzzy_index2 WHERE translation_unit_id=1").fetchone()[0]
+            fi4_cnt = cur.execute("SELECT count(*) FROM fuzzy_index4 WHERE translation_unit_id=1").fetchone()[0]
+            self.assertEqual(fi1_cnt, 1)
+            self.assertEqual(fi2_cnt, 1)
+            self.assertEqual(fi4_cnt, 1)
+            conn.close()
+
             units = list(iter_sdltm(res_path, src, tgt))
-            self.assertEqual(len(units), 0)
+            self.assertEqual(len(units), 1)
+            self.assertEqual(units[0].source, "Road Safety Conference")
+            self.assertEqual(units[0].target, "Conferência de Segurança Viária")
+
+    def test_editor_shortcuts_case_and_copy(self):
+        """Verifica os atalhos Ctrl+Ins (copiar original p/ tradução) e Ctrl+F3 (alternar caixa alta/baixa/título)."""
+        import tempfile
+        from PySide6.QtWidgets import QApplication
+        from ui.screens.editor_screen import EditorScreen
+        from core.tm import TranslationMemory
+        from core.segment import Segment, SegState
+
+        app = QApplication.instance() or QApplication([])
+        editor = EditorScreen()
+
+        db_path = os.path.join(tempfile.gettempdir(), "test_shortcuts.db")
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        tm = TranslationMemory(db_path)
+        tm.add_many([Segment(source="Sistema de travagem automática", target="", state=SegState.UNTRANSLATED)], "pt-PT", "pt-BR")
+        editor._on_file_loaded(tm, "pt-PT", "pt-BR", 1)
+
+        # 1. Ctrl+Insert -> copy_source_to_target
+        editor.copy_source_to_target()
+        self.assertEqual(editor.tgt_edit.toPlainText(), "Sistema de travagem automática")
+
+        # 2. Ctrl+F3 -> cycle_case (Misto -> CAIXA ALTA -> caixa baixa -> Primeira Maiúscula)
+        editor.cycle_case()
+        self.assertEqual(editor.tgt_edit.toPlainText(), "SISTEMA DE TRAVAGEM AUTOMÁTICA")
+        editor.cycle_case()
+        self.assertEqual(editor.tgt_edit.toPlainText(), "sistema de travagem automática")
+        editor.cycle_case()
+        self.assertEqual(editor.tgt_edit.toPlainText(), "Sistema De Travagem Automática")
+
+        tm.close()
+        if os.path.exists(db_path):
+            os.remove(db_path)
 
 
 if __name__ == "__main__":

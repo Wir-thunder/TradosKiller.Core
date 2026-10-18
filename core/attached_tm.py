@@ -123,7 +123,10 @@ class AttachedTMManager:
                      min_match: int = 70, limit: int = 5) -> List[TMMatch]:
         results: List[TMMatch] = []
         try:
-            conn = sqlite3.connect(f"file:{tm.path}?mode=ro", uri=True)
+            import re
+            from xml.sax.saxutils import escape
+
+            conn = sqlite3.connect(f"file:{tm.path}?mode=ro", uri=True, timeout=5.0)
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
 
@@ -148,48 +151,69 @@ class AttachedTMManager:
                 conn.close()
                 return results
 
-            # 2. Busca exata por XML Value
-            pat = f"%<Value>{clean_src}</Value>%"
-            row2 = cur.execute(
-                "SELECT source_segment, target_segment FROM translation_units WHERE source_segment LIKE ? LIMIT 1",
-                (pat,)
-            ).fetchone()
+            # 2. Busca exata por XML Value (com e sem escape XML)
+            for cand_val in {clean_src, escape(clean_src)}:
+                pat = f"%<Value>{cand_val}</Value>%"
+                row2 = cur.execute(
+                    "SELECT source_segment, target_segment FROM translation_units WHERE source_segment LIKE ? LIMIT 1",
+                    (pat,)
+                ).fetchone()
+                if row2 and row2["target_segment"]:
+                    src_parsed, _ = parse_sdltm_segment_xml(row2["source_segment"])
+                    if display_text(src_parsed).strip().lower() == clean_src.lower():
+                        tgt_txt, _ = parse_sdltm_segment_xml(row2["target_segment"])
+                        eff_percent = max(0, 100 - tm.penalty)
+                        results.append(TMMatch(
+                            tm_name=tm.name,
+                            source=clean_src,
+                            target=tgt_txt,
+                            percent=eff_percent,
+                            is_exact=True,
+                            origin="SDLTM"
+                        ))
+                        conn.close()
+                        return results
 
-            if row2 and row2["target_segment"]:
-                tgt_txt, _ = parse_sdltm_segment_xml(row2["target_segment"])
-                eff_percent = max(0, 100 - tm.penalty)
-                results.append(TMMatch(
-                    tm_name=tm.name,
-                    source=clean_src,
-                    target=tgt_txt,
-                    percent=eff_percent,
-                    is_exact=True,
-                    origin="SDLTM"
-                ))
-                conn.close()
-                return results
+            # 3. Busca Fuzzy inteligente filtrando pelas palavras mais significativas
+            words = sorted(
+                {w for w in re.findall(r"\w{3,}", clean_src) if not w.isdigit()},
+                key=len,
+                reverse=True
+            )[:3]
 
-            # 3. Busca Fuzzy parcial (amostra de unidades para comparar ratio)
-            # Pega as primeiras 200 unidades candidatas
-            rows = cur.execute(
-                "SELECT source_segment, target_segment FROM translation_units LIMIT 250"
-            ).fetchall()
+            rows = []
+            if words:
+                clauses = " OR ".join(["source_segment LIKE ?" for _ in words])
+                params = [f"%{w}%" for w in words]
+                rows = cur.execute(
+                    f"SELECT source_segment, target_segment FROM translation_units WHERE {clauses} LIMIT 300",
+                    params
+                ).fetchall()
+
+            if not rows:
+                rows = cur.execute(
+                    "SELECT source_segment, target_segment FROM translation_units LIMIT 250"
+                ).fetchall()
 
             for r in rows:
                 if not r["target_segment"] or not r["source_segment"]:
                     continue
                 cand_src, _ = parse_sdltm_segment_xml(r["source_segment"])
-                if not cand_src:
+                cand_src_clean = display_text(cand_src).strip()
+                if not cand_src_clean:
                     continue
 
-                ratio = int(difflib.SequenceMatcher(None, clean_src.lower(), cand_src.lower()).ratio() * 100)
+                if cand_src_clean.lower() == clean_src.lower():
+                    ratio = 100
+                else:
+                    ratio = int(difflib.SequenceMatcher(None, clean_src.lower(), cand_src_clean.lower()).ratio() * 100)
                 eff_percent = max(0, ratio - tm.penalty)
                 if eff_percent >= min_match:
                     cand_tgt, _ = parse_sdltm_segment_xml(r["target_segment"])
                     results.append(TMMatch(
                         tm_name=tm.name,
-                        source=cand_src,
-                        target=cand_tgt,
+                        source=cand_src_clean,
+                        target=display_text(cand_tgt),
                         percent=eff_percent,
                         is_exact=(eff_percent == 100),
                         origin="SDLTM"

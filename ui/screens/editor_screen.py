@@ -17,12 +17,12 @@ import uuid
 import tempfile
 from typing import Optional
 
-from PySide6.QtCore import Qt, QThread, Signal, QItemSelectionModel
+from PySide6.QtCore import Qt, QThread, Signal, QItemSelectionModel, QEvent
 from PySide6.QtGui import QColor, QPalette, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QPlainTextEdit, QTableView, QProgressBar, QFrame, QMessageBox,
-    QTextEdit, QAbstractItemView, QSplitter, QHeaderView
+    QTextEdit, QAbstractItemView, QSplitter, QHeaderView, QLineEdit, QApplication
 )
 
 from core.tm import TranslationMemory
@@ -477,10 +477,34 @@ class EditorScreen(QWidget):
         tgt_v = QVBoxLayout(tgt_box)
         tgt_v.setContentsMargins(0, 0, 0, 0)
         tgt_header = QHBoxLayout()
-        tgt_lbl = QLabel("Tradução Ativa (Ctrl+Enter para Confirmar):")
+        tgt_lbl = QLabel("Tradução Ativa (Ctrl+Enter confirmar | Ctrl+Ins copiar | Ctrl+F3 caixa):")
         tgt_lbl.setStyleSheet("color: #2ecc71; font-weight: bold; font-size: 11px;")
         tgt_header.addWidget(tgt_lbl)
         tgt_header.addStretch()
+
+        btn_case = QPushButton("Aa Caixa (Ctrl+F3)")
+        btn_case.setToolTip("Alternar entre MAIÚSCULAS, minúsculas e Primeira Maiúscula (Ctrl+F3 ou Shift+F3)")
+        btn_case.setStyleSheet("""
+            QPushButton {
+                background-color: #333; color: #ddd; border: 1px solid #444;
+                border-radius: 3px; padding: 2px 8px; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #444; color: white; }
+        """)
+        btn_case.clicked.connect(self.cycle_case)
+        tgt_header.addWidget(btn_case)
+
+        btn_copy_quick = QPushButton("📋 Copiar Original (Ctrl+Ins)")
+        btn_copy_quick.setToolTip("Copia o texto original para a tradução (Ctrl+Insert ou Ctrl+Alt+F)")
+        btn_copy_quick.setStyleSheet("""
+            QPushButton {
+                background-color: #333; color: #ddd; border: 1px solid #444;
+                border-radius: 3px; padding: 2px 8px; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #444; color: white; }
+        """)
+        btn_copy_quick.clicked.connect(self.copy_source_to_target)
+        tgt_header.addWidget(btn_copy_quick)
 
         btn_confirm = QPushButton("✓ Confirmar & Próximo (Ctrl+Enter)")
         btn_confirm.setStyleSheet("""
@@ -521,16 +545,23 @@ class EditorScreen(QWidget):
         layout.addWidget(splitter)
 
     def _setup_shortcuts(self) -> None:
-        """Instala os atalhos de teclado padrão Trados Studio."""
+        """Instala os atalhos de teclado padrão para tradução rápida."""
         QShortcut(QKeySequence("Ctrl+F"), self, self.show_find)
         QShortcut(QKeySequence("Ctrl+H"), self, self.show_replace)
         QShortcut(QKeySequence("Ctrl+Return"), self, self.confirm_and_next)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, self.confirm_and_next)
         QShortcut(QKeySequence("Ctrl+Shift+A"), self, lambda: self.set_current_status(SegState.APPROVED))
         QShortcut(QKeySequence("Ctrl+Shift+R"), self, lambda: self.set_current_status(SegState.REJECTED))
         QShortcut(QKeySequence("Ctrl+Alt+Down"), self, self.next_untranslated)
         QShortcut(QKeySequence("Ctrl+Up"), self, self.prev_segment)
         QShortcut(QKeySequence("Ctrl+Down"), self, self.next_segment)
         QShortcut(QKeySequence("Ctrl+Insert"), self, self.copy_source_to_target)
+        QShortcut(QKeySequence("Ctrl+Alt+F"), self, self.copy_source_to_target)
+        QShortcut(QKeySequence("Ctrl+Shift+C"), self, self.copy_source_to_target)
+        QShortcut(QKeySequence("Ctrl+F3"), self, self.cycle_case)
+        QShortcut(QKeySequence("Shift+F3"), self, self.cycle_case)
+        QShortcut(QKeySequence("Alt+Delete"), self, self.clear_target)
+        QShortcut(QKeySequence("Ctrl+Shift+X"), self, self.clear_target)
         QShortcut(QKeySequence("F3"), self, self.show_concordance)
         QShortcut(QKeySequence("F6"), self, self.toggle_advanced_filter)
         QShortcut(QKeySequence("F7"), self, self._check_spelling)
@@ -539,8 +570,70 @@ class EditorScreen(QWidget):
         QShortcut(QKeySequence("Ctrl+Alt+S"), self, self.split_current_segment)
         QShortcut(QKeySequence("Alt+F8"), self, self.show_project_settings)
         QShortcut(QKeySequence("Ctrl+T"), self, self._apply_best_match)
+        QShortcut(QKeySequence("Ctrl+1"), self, lambda: self._apply_match_by_index(0))
+        QShortcut(QKeySequence("Ctrl+2"), self, lambda: self._apply_match_by_index(1))
+        QShortcut(QKeySequence("Ctrl+3"), self, lambda: self._apply_match_by_index(2))
         QShortcut(QKeySequence("Ctrl+G"), self, self.translate_current_with_slm)
         QShortcut(QKeySequence("Alt+1"), self, self.toggle_results_panel)
+
+        # Instala filtro de eventos para interceptar Ctrl+Insert, Ctrl+F3, Shift+F3 e Ctrl+Enter
+        # antes que o QPlainTextEdit ou QTableView os consuma com comportamentos padrão do sistema
+        for w in (self, self.tgt_edit, self.src_edit, self.table, self.table.viewport()):
+            w.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        """Intercepta atalhos críticos do tradutor mesmo quando o foco está dentro de caixas de edição."""
+        if event.type() in (QEvent.ShortcutOverride, QEvent.KeyPress):
+            key = event.key()
+            mods = event.modifiers()
+            ctrl = bool(mods & Qt.ControlModifier)
+            shift = bool(mods & Qt.ShiftModifier)
+            alt = bool(mods & Qt.AltModifier)
+
+            # 1. Ctrl+Insert ou Ctrl+Alt+F: Copiar Original para Tradução
+            if (ctrl and not shift and not alt and key == Qt.Key_Insert) or (ctrl and alt and key == Qt.Key_F):
+                if event.type() == QEvent.ShortcutOverride:
+                    event.accept()
+                    return True
+                self.copy_source_to_target()
+                return True
+
+            # 2. Ctrl+F3 ou Shift+F3: Alternar Caixa Alta / Caixa Baixa / Título
+            if key == Qt.Key_F3 and ((ctrl and not alt) or (shift and not ctrl and not alt)):
+                if event.type() == QEvent.ShortcutOverride:
+                    event.accept()
+                    return True
+                self.cycle_case()
+                return True
+
+            # 3. Ctrl+Enter / Ctrl+Return: Confirmar segmento e ir para o próximo
+            if ctrl and not alt and key in (Qt.Key_Return, Qt.Key_Enter):
+                if event.type() == QEvent.ShortcutOverride:
+                    event.accept()
+                    return True
+                self.confirm_and_next()
+                return True
+
+            # 4. Alt+Delete: Limpar tradução
+            if alt and not ctrl and key == Qt.Key_Delete:
+                if event.type() == QEvent.ShortcutOverride:
+                    event.accept()
+                    return True
+                self.clear_target()
+                return True
+
+            # 5. Ctrl+Up / Ctrl+Down: Navegar entre segmentos mesmo dentro do editor
+            if ctrl and not alt and not shift and key in (Qt.Key_Up, Qt.Key_Down):
+                if event.type() == QEvent.ShortcutOverride:
+                    event.accept()
+                    return True
+                if key == Qt.Key_Up:
+                    self.prev_segment()
+                else:
+                    self.next_segment()
+                return True
+
+        return super().eventFilter(obj, event)
 
     def toggle_results_panel(self) -> None:
         """Alterna a visibilidade do painel de Resultados de Tradução para despoluir a tela (Alt+1)."""
@@ -823,14 +916,100 @@ class EditorScreen(QWidget):
         QMessageBox.information(self, "Navegação", "Todos os segmentos disponíveis já foram traduzidos!")
 
     def copy_source_to_target(self) -> None:
-        """Copia a fonte para a tradução."""
-        self.tgt_edit.setPlainText(self.src_edit.toPlainText())
+        """Copia a fonte para a tradução (Ctrl+Insert / Ctrl+Alt+F) e sincroniza com a grelha."""
+        src_text = self.src_edit.toPlainText()
+        if not src_text and self.model and self._current_row >= 0:
+            seg = self.model.segment_at(self._current_row)
+            if seg:
+                src_text = display_text(seg.source)
+
+        self.tgt_edit.setPlainText(src_text)
+        # Se houver um QLineEdit aberto na grelha in-cell, atualiza-o também
+        focus_w = QApplication.focusWidget()
+        if isinstance(focus_w, QLineEdit) and self.table.isAncestorOf(focus_w):
+            focus_w.setText(src_text)
+        self.save_current()
         self.tgt_edit.setFocus()
+        cursor = self.tgt_edit.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self.tgt_edit.setTextCursor(cursor)
 
     def clear_target(self) -> None:
-        """Limpa o campo de tradução."""
+        """Limpa o campo de tradução (Alt+Del) e sincroniza com a grelha."""
         self.tgt_edit.clear()
+        focus_w = QApplication.focusWidget()
+        if isinstance(focus_w, QLineEdit) and self.table.isAncestorOf(focus_w):
+            focus_w.clear()
+        self.save_current()
         self.tgt_edit.setFocus()
+
+    def cycle_case(self) -> None:
+        """
+        Alterna a caixa do texto selecionado (ou de toda a tradução se nada estiver selecionado)
+        entre MAIÚSCULAS ➔ minúsculas ➔ Primeira Maiúscula (Ctrl+F3 / Shift+F3).
+        """
+        def _next_case(s: str) -> str:
+            if not s:
+                return s
+            if s.isupper():
+                return s.lower()
+            if s.islower():
+                return s.title()
+            return s.upper()
+
+        # 1. Verifica se o utilizador está a editar diretamente numa célula da tabela (QLineEdit)
+        focus_w = QApplication.focusWidget()
+        if isinstance(focus_w, QLineEdit) and self.table.isAncestorOf(focus_w):
+            if focus_w.hasSelectedText():
+                start = focus_w.selectionStart()
+                sel = focus_w.selectedText()
+                transformed = _next_case(sel)
+                full = focus_w.text()
+                focus_w.setText(full[:start] + transformed + full[start + len(sel):])
+                focus_w.setSelection(start, len(transformed))
+            else:
+                transformed = _next_case(focus_w.text())
+                focus_w.setText(transformed)
+            self.tgt_edit.setPlainText(focus_w.text())
+            self.save_current()
+            return
+
+        # 2. Caso padrão: opera sobre o editor de tradução (tgt_edit)
+        cursor = self.tgt_edit.textCursor()
+        if cursor.hasSelection():
+            start = cursor.selectionStart()
+            end = cursor.selectionEnd()
+            sel = cursor.selectedText()
+            transformed = _next_case(sel)
+            cursor.insertText(transformed)
+            cursor.setPosition(start)
+            cursor.setPosition(start + len(transformed), cursor.MoveMode.KeepAnchor)
+            self.tgt_edit.setTextCursor(cursor)
+        else:
+            full_text = self.tgt_edit.toPlainText()
+            if full_text:
+                transformed = _next_case(full_text)
+                self.tgt_edit.setPlainText(transformed)
+                cursor = self.tgt_edit.textCursor()
+                cursor.movePosition(cursor.MoveOperation.End)
+                self.tgt_edit.setTextCursor(cursor)
+        self.save_current()
+        self.tgt_edit.setFocus()
+
+    def _apply_match_by_index(self, match_idx: int) -> None:
+        """Aplica a correspondência #N (Ctrl+1, Ctrl+2, Ctrl+3) à tradução ativa."""
+        txt = self.fuzzy_edit.toPlainText().strip()
+        if not txt or "Nenhuma correspondência" in txt:
+            return
+        lines = [line.strip() for line in txt.splitlines() if "]" in line]
+        if 0 <= match_idx < len(lines):
+            target_line = lines[match_idx]
+            match_content = target_line.split("]", 1)[-1].strip()
+            if "➔" in match_content:
+                match_content = match_content.split("➔", 1)[-1].strip()
+            self.tgt_edit.setPlainText(match_content)
+            self.save_current()
+            self.tgt_edit.setFocus()
 
     def merge_with_next_segment(self) -> bool:
         """Mescla o segmento atual com o próximo (Ctrl+Alt+M), desfazendo quebras indevidas."""
